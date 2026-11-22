@@ -1186,6 +1186,7 @@ function summary(lo){
   var own=L.groupLoad!=null&&!(+L.groupLoad===0&&cl>0); r.ownLoad=own;
   var load=own?L.groupLoad:(cl>0?cl:gt/gs);
   r.share=load; r.shareBase=gt?load*r.gBase/gt:0; r.shareFuel=gt?load*r.gFuel/gt:0;
+  if(!own&&cl>0&&GG.split){ var sp=GG.split(); if(sp){ r.shareBase=sp.base; r.shareFuel=sp.fuel; } }
   var f=food(); r.food=f.total; r.foodEst=!f.menu; r.evenSplit=!(cl>0)&&!own; r.water=(+L.food.water||0)*1000; r.fuel=r.shareFuel;
   r.base=r.pBase+r.shareBase;
   r.cons=r.food+r.water+r.fuel+r.consOther;
@@ -1500,10 +1501,15 @@ function claimedHTML(){
   if(!m.length) return head('')+'<p class="note">Nothing yet. Pick items under <a href="#group">Group gear</a> and they appear here and count in your pack weight.</p>';
   var tot=m.reduce(function(a,x){return a+x.g*x.n;},0);
   return head(m.length+' item'+(m.length>1?'s':'')+', '+kg(tot))+m.map(function(x){
-      return '<div class="item claimed"><span class="ck" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>'+
-        '<div class="nm"><span>'+esc(x.name)+(x.n>1?' ×'+x.n:'')+'</span><span class="n">'+(x.g?'':'No weight yet: weigh it on Group gear')+'</span></div><span class="nq"></span><div class="cw">'+(x.g?fmt(x.g*x.n)+' g':'—')+'</div><span></span></div>'; }).join('')+
+      return '<div class="item claimed" data-id="'+esc(x.id)+'"><span class="ck" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>'+
+        '<div class="nm"><span>'+esc(x.name)+(x.n>1?' ×'+x.n:'')+'</span><span class="n">'+(x.g?'':'No weight yet: weigh it on Group gear')+'</span></div><span class="nq"></span>'+(x.cat?'<div class="g"><input type="number" min="0" step="5" inputmode="numeric" data-act="g" value="'+(x.g||'')+'" aria-label="Grams for '+esc(x.name)+'"></div><span class="u">g'+(x.n>1?' ×'+x.n:'')+'</span>':'<div class="cw">'+(x.g?fmt(x.g*x.n)+' g':'—')+'</div><span></span>')+'</div>'; }).join('')+
+    dupWarn()+
     (L.groupLoad!=null&&!(+L.groupLoad===0&&tot>0)?'<p class="note">You typed your own group load ('+kg(L.groupLoad)+') on Group gear, so that is used instead. <button class="linkbtn" data-act="gload-clear">Use what you\'ve claimed</button></p>':'<p class="note">Change what you bring on <a href="#group">Group gear</a>.</p>');
 }
+/* someone who made their own "group kit" category before claiming would count the same things twice */
+function dupWarn(){ var lo=cur(), hit=[];
+  (lo.custom||[]).forEach(function(it){ if(it.scope==='p'&&/group/i.test(it.cat||'')&&isOn(it,stOf(lo,it.id))){ var c=hit.filter(function(h){return h.c===it.cat;})[0]; if(!c){ c={c:it.cat,g:0,n:0}; hit.push(c); } c.g+=weightOf(it,stOf(lo,it.id)); c.n++; } });
+  return hit.map(function(h){ return '<p class="warnbox">Your own category “'+esc(h.c)+'” also counts '+kg(h.g)+'. If it holds the same things you\'ve claimed here, untick or remove those items there so they aren\'t counted twice.</p>'; }).join(''); }
 function vGear(scope){
   var lo=cur(), its=items(lo,scope), cats=catList(lo,scope), group=scope==='g';
   var list=cats.map(function(c){
@@ -2910,7 +2916,10 @@ var GG=(function(){
   function mineIds(){ var s=slug(me); return claims.filter(function(c){return slug(c.name)===s;}); }
   function unitG(i){ var c=S.catalog.filter(function(x){return x.id===i.id&&x.scope==='g';})[0]; if(c){ var u=unitOf(c,stOf(cur(),c.id)); return u||c.g||c.typ||0; } return i.g||0; }
   function mineList(){ var L2=list(), by={}; L2.forEach(function(i){ by[i.id]=i; });
-    return mineIds().map(function(c){ var i=by[c.item]||{id:c.item,name:c.item,g:0}; return {id:i.id,name:i.name,n:c.n,g:unitG(i)}; }); }
+    return mineIds().map(function(c){ var i=by[c.item]||{id:c.item,name:c.item,g:0}, cat=S.catalog.filter(function(x){return x.id===i.id&&x.scope==='g';})[0];
+      var fuel=cat?catInfo(cur(),'g',cat.cat).kind==='cons':/\b(gas|fuel|canister)\b/i.test(i.name);
+      return {id:i.id,name:i.name,n:c.n,g:unitG(i),fuel:fuel,cat:!!cat}; }); }
+  function mySplit(){ return mineList().reduce(function(a,x){ if(x.fuel) a.fuel+=x.g*x.n; else a.base+=x.g*x.n; return a; },{base:0,fuel:0}); }
   function myLoad(){ return mineList().reduce(function(a,x){ return a+x.g*x.n; },0); }
 
   function required(){
@@ -2994,7 +3003,7 @@ var GG=(function(){
       try{ var u=await claude.use('user'); if(u){ if(await u.canEdit()){ canEditGG=true; paint(); } if(u.can&&(await u.can('data.write'))===false){ ro=true; paint(); } } }catch(e){}
     }catch(e){ state='nodb'; paint(); }
   }
-  return {card:card,start:start,paint:paint,mineList:function(){ return state==='ok'?(slug(me)?mineList():[]):null; },state:function(){ return state; },load:function(){ return state==='ok'&&slug(me)?myLoad():null; },me:function(){ if(state!=='ok') return null; var all=list(), by={}; all.forEach(function(i){ by[i.id]=i; });
+  return {card:card,start:start,paint:paint,mineList:function(){ return state==='ok'?(slug(me)?mineList():[]):null; },state:function(){ return state; },load:function(){ return state==='ok'&&slug(me)?myLoad():null; },split:function(){ return state==='ok'&&slug(me)?mySplit():null; },me:function(){ if(state!=='ok') return null; var all=list(), by={}; all.forEach(function(i){ by[i.id]=i; });
       return {items:mineIds().map(function(c){ return ((by[c.item]||{}).name||c.item)+(c.n>1?' ×'+c.n:''); }),g:myLoad(),open:all.filter(function(i){ return (i.essential||i.extra)&&have(i.id)<i.need; }).length}; },who:function(id){ if(state!=='ok') return null; return claimsOf(id).map(function(c){return c.name+(c.n>1?' ×'+c.n:'');}); }};
 })();
 
