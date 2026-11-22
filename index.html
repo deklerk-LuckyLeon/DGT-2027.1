@@ -1337,9 +1337,12 @@ var FOOD=(function(){
   }
   function findIt(id){ var m=fMenu(); return m?m.items.filter(function(i){return i.id===id;})[0]:null; }
   /* older menus: fill in carbs, fat and hot water from the food list where the name matches */
-  function backfill(){ fMenus().forEach(function(m){ m.items.forEach(function(it){ if(it.c!=null) return; var base=String(it.name||'').replace(/\s*\(.*\)$/,''); var o=libByName(it.name)||libByName(base);
-      if(!o) FOOD_STARTER.forEach(function(x){ if(x[2]&&x[2]===it.name) o=libByName(x[1]); });
-      if(o&&(num(it.k)==null||Math.abs(num(it.k)-o.k)<1)){ it.c=o.c; it.f=o.f; if(it.w==null) it.w=o.w; if(it.p==null) it.p=o.p; } }); }); }
+  var FALIAS={'salami':'Salami / dry sausage','mama alles dehydrated dinner':'Mama Alles dehydrated meal','rusks (buttermilk)':'Rusks, buttermilk (Ouma)','prONutro':'ProNutro'};
+  function findLib(name){ var n=String(name||'').trim(), lo=n.toLowerCase(), base=lo.replace(/\s*\(.*\)$/,''), o=libByName(n)||libByName(base)||(FALIAS[lo]&&libByName(FALIAS[lo]));
+    if(!o) FOOD_STARTER.forEach(function(x){ if(x[2]&&x[2]===n) o=libByName(x[1]); });
+    if(!o&&base.length>=4) o=FLIB.filter(function(l){ return l.name.toLowerCase().indexOf(base)===0; })[0]||null; return o; }
+  function backfill(){ fMenus().forEach(function(m){ m.items.forEach(function(it){ if(it.c!=null) return; var o=findLib(it.name), k=num(it.k);
+      if(o&&(k==null||Math.abs(k-o.k)<=o.k*0.15)){ it.c=o.c; it.f=o.f; if(it.w==null) it.w=o.w; if(it.p==null) it.p=o.p; } }); }); }
 
   function rowHTML(it){
     return '<div class="fd-row" data-fid="'+it.id+'">'+
@@ -2936,7 +2939,7 @@ PEOPLE.start(); FOOD.start();
     if(m){ // personal gear: saved under the person's name, only when they choose to share it
       return {doc:function(){ return {
         get:async function(){ var g=(await call({a:'getgear'})).gear; return {exists:!!g,data:function(){return g;}}; },
-        set:async function(d){ if(lsg('dgt-share')!=='1') throw {code:'off'}; var rows=window.DGT_sheetRows?window.DGT_sheetRows():window.DGT_gearRows?window.DGT_gearRows():[]; await call({a:'gear',d:d,rows:rows}); },
+        set:async function(d){ if(lsg('dgt-share')==='0') throw {code:'off'}; var rows=window.DGT_sheetRows?window.DGT_sheetRows():window.DGT_gearRows?window.DGT_gearRows():[]; await call({a:'gear',d:d,rows:rows}); },
         delete:async function(){ await call({a:'gear',d:null,rows:[]}); } }; } };
     }
     return {
@@ -2979,8 +2982,8 @@ PEOPLE.start(); FOOD.start();
     var paint=function(){ var card=document.querySelector('[data-act="backup"]'); if(!card) return; card=card.closest('.card'); if(!card||card.querySelector('.dgt-acct')) return;
       var box=document.createElement('div'); box.className='dgt-acct';
       box.innerHTML=online?('<p class="note">Signed in as <b></b>'+(S.isAdmin?' (organiser)':'')+'. <button class="linkbtn" data-dgt="out">Switch person</button></p>'+
-        '<label class="adv-chk"><input type="checkbox" id="dgt-share"'+(lsg('dgt-share')==='1'?' checked':'')+'> Save my gear and food menu to the group sheet under my name</label>'+
-        '<p class="note">On: your gear and food follow you to any device you sign in on, and the group sheet shows them in your tab. Off: it stays in this browser only.</p>')
+        '<label class="adv-chk"><input type="checkbox" id="dgt-share"'+(lsg('dgt-share')!=='0'?' checked':'')+'> Save my gear and food menu to the group sheet under my name</label>'+
+        '<p class="note">On (the default): your gear and food are saved automatically and follow you to any device you sign in on; the group sheet shows them in your tab. Off: they stay in this browser only.</p>')
         :('<p class="note">Not signed in: shared parts are hidden and your gear stays in this browser. <button class="linkbtn" data-dgt="in">Sign in</button></p>');
       var b=box.querySelector('b'); if(b) b.textContent=S.who; card.appendChild(box); };
     paint(); new MutationObserver(paint).observe(document.getElementById('app'),{childList:true,subtree:true});
