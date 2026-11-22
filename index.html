@@ -683,6 +683,10 @@ table.pp tr.out td{color:var(--ink-faint)}
 .g-skip{align-self:center;font-size:13px}
 .g-msg:empty{display:none}
 .dgt-acct{border-top:1px solid var(--contour);margin-top:12px;padding-top:10px}
+
+.dgt-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px max(16px,env(safe-area-inset-left,0px));background:var(--accent-soft);border-bottom:1px solid var(--sunset-gold);font-size:14px;color:var(--ink)}
+.dgt-bar span{flex:1 1 280px;min-width:0}
+.dgt-bar .btn{white-space:nowrap}
 </style>
 </head><body>
 <div id="gate" class="gate" hidden><form class="g-card" autocomplete="on">
@@ -2904,8 +2908,8 @@ PEOPLE.start(); FOOD.start();
 
   async function call(body){
     if(!API) throw {code:'unavailable',message:'No backend configured'};
-    var r=await fetch(API,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({k:S.k,who:S.who,admin:S.admin},body))});
-    var j=await r.json();
+    var r; try{ r=await fetch(API,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({k:S.k,who:S.who,admin:S.admin},body))}); }catch(e){ throw {code:'network',message:'no connection'}; }
+    var j; try{ j=await r.json(); }catch(e){ throw {code:'network',message:'unexpected reply '+r.status}; }
     if(!j.ok) throw {code:j.code||'error',message:j.error||'Request failed'};
     return j;
   }
@@ -2945,12 +2949,19 @@ PEOPLE.start(); FOOD.start();
   window.claude={use:function(name){ return Promise.resolve(online?({db:db,user:user,artifact:artifact,self:artifact,sample:sample})[name]||null:null); }};
 
   /* ---- sign-in gate ---- */
+  function bar(kind,detail){
+    var b=document.getElementById('dgt-bar'); if(!b){ b=document.createElement('div'); b.id='dgt-bar'; b.className='dgt-bar'; b.setAttribute('role','status'); document.body.insertBefore(b,document.getElementById('app')); }
+    if(!kind){ b.hidden=true; return; } b.hidden=false;
+    b.innerHTML=kind==='guest'?'<span>You\'re looking around without signing in: the group\'s shared plans are hidden and nothing you change is shared.</span><button class="btn primary" data-dgt="in">Sign in</button>'
+      :'<span>Couldn\'t reach the group sheet'+(detail?' ('+detail+')':'')+'. You\'re seeing what this device saved last time; changes stay on this device.</span><button class="btn" data-dgt="retry">Try again</button><button class="linkbtn" data-dgt="out">Sign in as someone else</button>';
+  }
   function start(trip){
     if(trip){ var t=document.getElementById('dgt-trip'); if(t) t.textContent=JSON.stringify(trip); }
     if(S.who) lss('dgt-poll-name',S.who);
     var src=document.getElementById('dgt-app'), s=document.createElement('script'); s.textContent=src.textContent; document.body.appendChild(s);
     document.documentElement.classList.toggle('dgt-signedin',online);
     decorate(); poll();
+    if(!online) bar(S.who&&S.k?'offline':'guest',start.err); else bar(null);
   }
   function decorate(){ // signed-in line and the share switch on the Overview "Your data" card
     var paint=function(){ var card=document.querySelector('[data-act="backup"]'); if(!card) return; card=card.closest('.card'); if(!card||card.querySelector('.dgt-acct')) return;
@@ -2964,7 +2975,8 @@ PEOPLE.start(); FOOD.start();
     document.addEventListener('change',function(e){ if(e.target&&e.target.id==='dgt-share'){ lss('dgt-share',e.target.checked?'1':'0'); if(e.target.checked&&window.DGT_SYNC) window.DGT_SYNC.push(); } });
     document.addEventListener('click',function(e){ var t=e.target.closest&&e.target.closest('[data-dgt]'); if(!t) return;
       if(t.dataset.dgt==='out'){ ['dgt-who','dgt-pass','dgt-admin','dgt-isadmin'].forEach(function(k){ lss(k,null); }); location.reload(); }
-      if(t.dataset.dgt==='in'){ lss('dgt-skip',null); location.reload(); } });
+      if(t.dataset.dgt==='in'){ lss('dgt-skip',null); location.reload(); }
+      if(t.dataset.dgt==='retry'){ location.reload(); } });
   }
   function gate(msg){
     var g=document.getElementById('gate'); g.hidden=false;
@@ -2986,7 +2998,7 @@ PEOPLE.start(); FOOD.start();
     if(S.who&&S.k){
       try{ var all=await refresh(); start(all.trip); return; }
       catch(e){ if(e.code==='auth'){ lss('dgt-pass',null); S.k=null; gate('The group passcode has changed. Enter the new one.'); return; }
-        var c=null; try{ c=JSON.parse(localStorage.getItem('dgt-cache')||'null'); }catch(_){}
+        start.err=e&&e.message?String(e.message).slice(0,80):''; var c=null; try{ c=JSON.parse(localStorage.getItem('dgt-cache')||'null'); }catch(_){}
         if(c){ apply(c); } start(c&&c.trip); return; }
     }
     if(lsg('dgt-skip')==='1'){ offline(); return; }
