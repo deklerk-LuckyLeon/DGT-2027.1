@@ -911,6 +911,24 @@ nav.tb-groups a[aria-current="true"]{font-weight:600;border-bottom-color:var(--m
 .dp-facts .cv3 i{font-family:var(--f-body);font-size:13px;color:var(--ink-muted);white-space:normal}
 .dp-facts ul.marks3 li{font-size:15px}
 
+/* ==== readability: text sits on soft panels; topo lines show around them ==== */
+body{font-size:16px}
+.note{font-size:14px}
+.card,.me,.ov-sec,.ov-data,.dpanel,.lk-cat,.lk-todo{background:color-mix(in srgb,var(--surface-raised) 92%,transparent);border:0;border-radius:var(--r-md);padding:22px 24px}
+.ov-data{border-top:0}
+.me{margin-top:0}
+.me-stats{margin-left:-18px}
+@media (max-width:600px){.card,.me,.ov-sec,.ov-data,.dpanel,.lk-cat,.lk-todo{padding:18px 16px}}
+.dpanel{padding-top:24px}
+
+/* ==== route page: plan the days on top, day chips, then a map shaped like its terrain ==== */
+#plan-card .card{margin:0}
+.rmap{display:flex;flex-direction:column;gap:12px}
+.mapbox{height:auto;aspect-ratio:185/171;max-height:86vh;min-height:420px;width:100%}
+.mapbox.full{aspect-ratio:auto;max-height:none}
+@media (max-width:600px){.mapbox{aspect-ratio:auto;height:70vh;min-height:380px}}
+.dchip{font-size:14px;padding:7px 14px}
+
 /* ---- website: sign-in gate ---- */
 .gate{position:fixed;inset:0;z-index:200;background:var(--surface);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:max(24px,env(safe-area-inset-top)) 16px 24px}
 .gate::before{content:"";position:fixed;inset:0;z-index:-1;background:var(--ink);opacity:.1;-webkit-mask:var(--topo) center/cover no-repeat;mask:var(--topo) center/cover no-repeat}
@@ -1379,7 +1397,7 @@ function renderRoute(el){
   if(!el.dataset.built){
     el.dataset.built='1';
     el.innerHTML='<div class="head" style="padding-top:12px"><div><h2>Route map</h2><p class="note">Drag to move, scroll or pinch to zoom. Pick a day to zoom to it. Tap a cave, peak, water point or camp zone for details and coordinates.</p></div></div>'+
-      MAP.markup()+'<div id="route-table"></div><div id="plan-card"></div>';
+      '<div id="plan-card"></div>'+MAP.markup()+'<div id="route-table"></div>';
   }
   $('plan-card').innerHTML=planCard();
   var rows=PLAN.stages.map(function(d,i){
@@ -2298,6 +2316,7 @@ var MAP=(function(){
 
   function markup(){
     return '<div class="rmap">'+
+      '<div class="dchips" id="chips3" role="toolbar" aria-label="Choose a day"></div>'+
       '<div class="stage2"><div class="mapbox" id="mapbox"><canvas id="map2" tabindex="0" aria-label="Route map. Drag to move, scroll or pinch to zoom, plus and minus keys to zoom, arrow keys to move."></canvas>'+
         '<div class="mscale" id="mscale"></div>'+
         '<div class="mnorth" aria-hidden="true"><svg viewBox="-12 -12 24 24" width="22" height="22"><path d="M0,-9 L4,4 L0,1 L-4,4Z" fill="var(--sunset-gold)"/><text x="0" y="10" text-anchor="middle" font-size="6" fill="var(--ink)" font-family="JetBrains Mono,monospace">N</text></svg></div>'+
@@ -2314,7 +2333,6 @@ var MAP=(function(){
         '<div class="mhint" id="mhint">Tap the map for height · tap the trail for details</div>'+
         '<div class="mpop" id="mpop" hidden></div><div class="mattrib">Terrain: Copernicus GLO-90 DEM (via Open-Meteo)</div></div>'+
         '</div>'+
-      '<div class="dchips" id="chips3" role="toolbar" aria-label="Choose a day"></div>'+
       '<div class="dprof"><canvas id="prof3" aria-label="Elevation profile. Tap or drag to move along the route."></canvas><div class="cap"><span id="pcur3">Tap or drag the profile to move along the route</span><span>Elevation from the GPX track</span></div></div>'+
       '<section class="dpanel" id="panel3" aria-live="polite"></section>'+
     '</div>';
@@ -2439,12 +2457,14 @@ var MAP=(function(){
   var anim=null;
   var userMoved=false, RB=null;
   function routeBox(){ if(!RB) RB={x0:Math.min.apply(null,R.x),x1:Math.max.apply(null,R.x),z0:Math.min.apply(null,R.z),z1:Math.max.apply(null,R.z)}; return RB; }
-  function minScale(){ var b=routeBox(); return Math.min((W-40)/(b.x1-b.x0),(H-40)/(b.z1-b.z0))*0.9; }
+  function minScale(){ if(OG) return Math.max(W/(OG.nx*OG.step),H/(OG.nz*OG.step))*1.01; var b=routeBox(); return Math.min((W-40)/(b.x1-b.x0),(H-40)/(b.z1-b.z0))*0.9; }
+  function coverAxis(c,lo,hi,view){ return hi-lo<=view?(lo+hi)/2:Math.max(lo+view/2,Math.min(hi-view/2,c)); }
   function clampS(s){ return Math.max(minScale(),Math.min(220,s)); }
   function clampAxis(c,lo,hi,view){ var half=view/2, pad=view*0.15;
     if(hi-lo<=view-2*pad){ var mid=(lo+hi)/2, slack=(view-2*pad-(hi-lo))/2; return Math.max(mid-slack,Math.min(mid+slack,c)); }
     return Math.max(lo+half-pad,Math.min(hi-half+pad,c)); }
-  function clampC(){ var b=routeBox(); cx=clampAxis(cx,b.x0,b.x1,W/sc); cz=clampAxis(cz,b.z0,b.z1,H/sc); }
+  function clampC(){ var b=routeBox(); cx=clampAxis(cx,b.x0,b.x1,W/sc); cz=clampAxis(cz,b.z0,b.z1,H/sc);
+    if(OG){ var hs=OG.step/2; cx=coverAxis(cx,OG.x0-hs,OG.x0+(OG.nx-1)*OG.step+hs,W/sc); cz=coverAxis(cz,OG.z0-hs,OG.z0+(OG.nz-1)*OG.step+hs,H/sc); } }
   function setView(x,z,s,ms){
     s=clampS(s);
     if(!ms||(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)){ cx=x; cz=z; sc=s; clampC(); req(); return; }
