@@ -940,6 +940,10 @@ body{font-size:16px}
 .fd-imp{margin:12px 0;padding:14px 0;border-top:1px solid var(--contour);border-bottom:1px solid var(--contour)}
 .fd-imp textarea{width:100%;min-height:150px;font-size:13.5px}
 .fd-spare{border-top:1px dashed var(--contour);margin-top:8px;padding-top:6px}
+.mbase{border:0;margin:0 0 10px;padding:0 0 10px;border-bottom:1px solid var(--contour)}
+.mbase legend{font-size:13px;font-weight:600;padding:0;margin-bottom:4px}
+.mbase label{display:flex;gap:8px;align-items:center;font-size:14px;padding:3px 0}
+.mattrib a{color:inherit}
 
 /* ---- website: sign-in gate ---- */
 .gate{position:fixed;inset:0;z-index:200;background:var(--surface);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:max(24px,env(safe-area-inset-top)) 16px 24px}
@@ -2376,6 +2380,29 @@ var MAP=(function(){
   function naismith(dist,up){ var h=dist/4+up/600; return Math.floor(h)+' h '+String(Math.round((h%1)*60)).padStart(2,'0'); }
   function dayOfKm(km){ for(var i=0;i<bounds.length;i++) if(km<=bounds[i][1]+1e-6) return i+1; return bounds.length; }
   function coordStr(lat,lon){return Math.abs(lat).toFixed(5)+'° '+(lat<0?'S':'N')+', '+Math.abs(lon).toFixed(5)+'° '+(lon<0?'W':'E');}
+  var TILES=!!window.DGT_CONFIG, base=(function(){ if(!TILES) return 'relief'; try{ return localStorage.getItem('dgt-base')||'otm'; }catch(e){ return 'otm'; } })(), tcache={}, tcount=0;
+  function tileImg(z,x,y){ var k=z+'/'+x+'/'+y, t=tcache[k]; if(t) return t;
+    if(tcount>500){ tcache={}; tcount=0; }
+    var img=new Image(); t=tcache[k]={img:img,ok:false,bad:false}; tcount++;
+    img.onload=function(){ t.ok=true; req(); }; img.onerror=function(){ t.bad=true; };
+    img.src='https://'+'abc'.charAt((x+y)%3)+'.tile.opentopomap.org/'+k+'.png'; return t; }
+  function drawTiles(){
+    var p=D.proj, lat0=p.lat0, mpp0=156543.03*Math.cos(lat0*Math.PI/180), dp=window.devicePixelRatio||1;
+    var z=Math.max(6,Math.min(17,Math.round(Math.log(sc*dp*mpp0/1000)/Math.LN2)));
+    var a=toLL(wx(0),wz(0)), b=toLL(wx(W),wz(H));
+    function tx(lon,n){ return Math.floor((lon+180)/360*n); }
+    function ty(lat,n){ var r=lat*Math.PI/180; return Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n); }
+    function lonOf(x,n){ return x/n*360-180; } function latOf(y,n){ return Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI; }
+    var n, x0,x1,y0,y1;
+    for(;;){ n=Math.pow(2,z); x0=tx(a.lon,n); x1=tx(b.lon,n); y0=ty(a.lat,n); y1=ty(b.lat,n); if((x1-x0+1)*(y1-y0+1)<=48||z<=6) break; z--; }
+    for(var y=y0;y<=y1;y++) for(var x=x0;x<=x1;x++){ var t=tileImg(z,x,y); if(!t.ok) continue;
+      var lw=lonOf(x,n), le=lonOf(x+1,n), ln=latOf(y,n), ls=latOf(y+1,n);
+      var X0=sx((lw-p.lon0)*p.kx), X1=sx((le-p.lon0)*p.kx), Y0=sy(-(ln-p.lat0)*p.ky), Y1=sy(-(ls-p.lat0)*p.ky);
+      ctx.drawImage(t.img,X0,Y0,X1-X0+0.5,Y1-Y0+0.5); }
+  }
+  function setBase(v){ base=v; try{ localStorage.setItem('dgt-base',v); }catch(e){}
+    var at=$('mattrib'); if(at) at.innerHTML=v==='otm'?'Map: © <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (CC-BY-SA), data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors, SRTM':'Terrain: Copernicus GLO-90 DEM (via Open-Meteo)';
+    req(); }
   function sx(x){return (x-cx)*sc+W/2;} function sy(z){return (z-cz)*sc+H/2;}
   function wx(px){return (px-W/2)/sc+cx;} function wz(py){return (py-H/2)/sc+cz;}
 
@@ -2388,6 +2415,7 @@ var MAP=(function(){
         '<div class="mhud"><div class="row"><button class="mb" id="mIn" aria-label="Zoom in">+</button><button class="mb" id="mOut" aria-label="Zoom out">−</button></div>'+
           '<button class="mb" id="mFit" aria-label="Whole route" title="Whole route"><i aria-hidden="true">◱</i><span class="t">Whole route</span></button><button class="mb" id="mLoc" aria-pressed="false" aria-label="Where am I" title="Show where you are (GPS)"><i aria-hidden="true">◎</i><span class="t">Where am I</span></button><button class="mb" id="mMeas" aria-pressed="false" aria-label="Measure" title="Measure distance and climb"><i aria-hidden="true">⟷</i><span class="t">Measure</span></button><button class="mb" id="mLay" aria-pressed="false" aria-label="Layers" title="Layers"><i aria-hidden="true">☰</i><span class="t">Layers</span></button><button class="mb" id="mFull" aria-pressed="false" aria-label="Full screen" title="Full screen"><i aria-hidden="true">⤢</i><span class="t">Full screen</span></button>'+
           '<div class="mlayers" id="mlayers" hidden>'+
+            (TILES?'<fieldset class="mbase"><legend>Base map</legend><label><input type="radio" name="mbase" value="otm"'+(base==='otm'?' checked':'')+'> OpenTopoMap (needs a signal)</label><label><input type="radio" name="mbase" value="relief"'+(base!=='otm'?' checked':'')+'> Built-in relief (works offline)</label></fieldset>':'')+
             [['grade','linear-gradient(90deg,#4F9A55,#E5A13C,#A8281C)','Colour the trail by steepness',1],['sleep','var(--good)','Sleeping caves'],['no','var(--danger)','No-camping caves'],['water','var(--water)','Water points from the GPX'],['streams','var(--water)','Likely streams (worked out from the terrain)'],['bail','var(--danger)','Bail-out passes and rough way down'],['zones','var(--sunset-gold)','Daily camp zones'],['alts','var(--ink-muted)','Alternate variants'],['km','var(--ink)','Kilometre marks'],['labels','var(--ink)','Peak names'],['places','var(--ink-muted)','Towns, camps and lodges nearby']]
               .map(function(l){return '<label><input type="checkbox" data-layer="'+l[0]+'"'+(l[3]?'':' checked')+'><span class="sw" style="background:'+l[1]+'"></span>'+l[2]+'</label>';}).join('')+
             (window.DGT_CONFIG?'<div class="mext"><span>For your GPS app</span><a href="#" id="xGpx">Download GPX ↓</a></div>':'')+'<div class="mext"><span>Open this view in</span><a id="xOtm" target="_blank" rel="noopener">OpenTopoMap ↗</a><a id="xTopo" target="_blank" rel="noopener">topographic-map.com ↗</a><a id="xSat" target="_blank" rel="noopener">Satellite (Google Maps) ↗</a></div>'+
@@ -2396,7 +2424,7 @@ var MAP=(function(){
         '<div class="mtip" id="mtip" hidden></div><div class="mgrade" id="mgrade" hidden>'+GRADE_CLS.map(function(c){return '<span><i style="background:'+c[1]+'"></i>'+c[2]+'</span>';}).join('')+'</div>'+
         '<div class="mmeas" id="mmeas" hidden></div>'+
         '<div class="mhint" id="mhint">Tap the map for height · tap the trail for details</div>'+
-        '<div class="mpop" id="mpop" hidden></div><div class="mattrib">Terrain: Copernicus GLO-90 DEM (via Open-Meteo)</div></div>'+
+        '<div class="mpop" id="mpop" hidden></div><div class="mattrib" id="mattrib">Terrain: Copernicus GLO-90 DEM (via Open-Meteo)</div></div>'+
         '</div>'+
       '<div class="dprof"><canvas id="prof3" aria-label="Elevation profile. Tap or drag to move along the route."></canvas><div class="cap"><span id="pcur3">Tap or drag the profile to move along the route</span><span>Elevation from the GPX track</span></div></div>'+
       '<section class="dpanel" id="panel3" aria-live="polite"></section>'+
@@ -2471,7 +2499,8 @@ var MAP=(function(){
     ctx.imageSmoothingEnabled=true;
     if(outerRelief) ctx.drawImage(outerRelief,sx(OG.x0),sy(OG.z0),(OG.nx-1)*OG.step*sc,(OG.nz-1)*OG.step*sc);
     if(relief) ctx.drawImage(relief,sx(G.x0),sy(G.z0),(NX-1)*ST*sc,(NZ-1)*ST*sc);
-    if(layers.places&&D.places) drawRegions();
+    if(base==='otm') drawTiles();
+    if(layers.places&&D.places&&base!=='otm') drawRegions();
     ctx.lineJoin='round'; ctx.lineCap='round';
     if(layers.alts){ ctx.setLineDash([6,5]); Object.keys(D.alts).forEach(function(k){ var a=D.alts[k]; line(a.x,a.z,0,a.x.length-1); ctx.strokeStyle=P.alt; ctx.lineWidth=2; ctx.stroke(); }); ctx.setLineDash([]); }
     if(layers.zones){ zones.forEach(function(z){ if(z.day===days.length) return; ctx.beginPath(); ctx.arc(sx(z.x),sy(z.z),z.r*sc,0,7);
@@ -2755,7 +2784,7 @@ var MAP=(function(){
   }
   window.DGT_GPX=gpxDownload;
   function boot(){
-    booted=true;
+    booted=true; if(TILES) setTimeout(function(){ setBase(base); },0);
     cv=$('map2'); ctx=cv.getContext('2d');
     try{ buildRelief(); }catch(e){ relief=null; }
     var retheme=function(){ var m=cssv('--map-mode'); if(P&&((P.dark&&m==='light')||(!P.dark&&m!=='light'))){ try{ buildRelief(); }catch(e){} req(); try{ drawProfile(); }catch(e){} } };
@@ -2775,7 +2804,7 @@ var MAP=(function(){
     $('mLoc').addEventListener('click',function(){ locate(this); });
     var gx=$('xGpx'); if(gx) gx.addEventListener('click',function(e){ e.preventDefault(); gpxDownload(); });
     $('mLay').addEventListener('click',function(){ var l=$('mlayers'); l.hidden=!l.hidden; this.setAttribute('aria-pressed',String(!l.hidden)); });
-    $('mlayers').addEventListener('change',function(e){ var k=e.target.dataset.layer; if(k){ layers[k]=e.target.checked; $('mgrade').hidden=!layers.grade; req(); } });
+    $('mlayers').addEventListener('change',function(e){ if(e.target.name==='mbase'){ setBase(e.target.value); return; } var k=e.target.dataset.layer; if(k){ layers[k]=e.target.checked; $('mgrade').hidden=!layers.grade; req(); } });
     // pan, pinch, tap
     var pts={}, last=null, moved=0, pinch=null;
     cv.addEventListener('pointerdown',function(e){ cv.setPointerCapture(e.pointerId); pts[e.pointerId]={x:e.clientX,y:e.clientY}; anim=null; moved=0; cv.classList.add('drag');
