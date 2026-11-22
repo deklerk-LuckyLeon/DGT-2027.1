@@ -937,6 +937,9 @@ body{font-size:16px}
 .item .g input{width:80px}
 .sum-row b{white-space:nowrap}
 @media (max-width:520px){.item .g input{width:70px}}
+.fd-imp{margin:12px 0;padding:14px 0;border-top:1px solid var(--contour);border-bottom:1px solid var(--contour)}
+.fd-imp textarea{width:100%;min-height:150px;font-size:13.5px}
+.fd-spare{border-top:1px dashed var(--contour);margin-top:8px;padding-top:6px}
 
 /* ---- website: sign-in gate ---- */
 .gate{position:fixed;inset:0;z-index:200;background:var(--surface);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:max(24px,env(safe-area-inset-top)) 16px 24px}
@@ -1213,7 +1216,7 @@ function packByDay(lo){
   var s=summary(lo||cur()),f=food(),g=gasPlan(),out=[];
   var fuelBurn=s.fuel*Math.min(1,g.have?g.need/g.have:1);
   for(var d=1;d<=N;d++){
-    var foodLeft=f.perDay*(N-d+1+(+L.food.spare||0));
+    var foodLeft=f.perDay*(N-d+1)+(f.total-f.perDay*N);
     var fuelNow=Math.max(0,s.fuel-fuelBurn*((d-1)/N));
     var other=s.consOther*(1-(d-1)/N);
     out.push({day:d,base:s.base,food:foodLeft,water:s.water,fuel:fuelNow+other,total:s.base+foodLeft+s.water+fuelNow+other});
@@ -1665,7 +1668,7 @@ function vCompare(){
 /* ----- food ----- */
 /* Each person builds one or more menus (daily ration plans). The active menu drives the food weight everywhere else
    (Weight tab, pack chart, weight advice). Without a menu, the quick estimate (kcal a day ÷ kcal per 100 g) is used. */
-var MEALS=[['bf','Breakfast'],['lu','Lunch'],['sn','Trail snacks'],['di','Dinner'],['dr','Drinks']];
+var MEALS=[['bf','Breakfast'],['lu','Lunch'],['sn','Trail snacks'],['di','Dinner'],['dr','Drinks'],['sp','Spare day']];
 var MEAL_NAME={}; MEALS.forEach(function(m){ MEAL_NAME[m[0]]=m[1]; });
 /* Food groups, and the meals each one is suggested for. */
 var FCATS=[['cer','Porridge & cereals',['bf']],['dai','Milk powder & creamers',['bf','dr']],['brd','Breads, wraps & crackers',['lu','bf']],
@@ -1721,10 +1724,11 @@ function fMine(){ var f=L.food; if(!f.mine) f.mine=[]; return f.mine; }
 function fDays(it){ var d=num(it.days); return d==null?N:Math.max(0,Math.min(d,N)); }
 function menuCalc(m){
   if(!m||!m.items||!m.items.length) return null;
-  var r={gpd:0,kpd:0,ppd:0,cpd:0,fpd:0,kMac:0,wml:0,meals:{},noK:[],noG:[],hasP:false};
+  var r={gpd:0,kpd:0,ppd:0,cpd:0,fpd:0,kMac:0,wml:0,meals:{},noK:[],noG:[],hasP:false,spG:0,spK:0};
   MEALS.forEach(function(x){ r.meals[x[0]]={g:0,k:0}; });
   m.items.forEach(function(it){
     var share=N?fDays(it)/N:1, g0=num(it.g)||0, g=g0*share, k=num(it.k), p=num(it.p), c=num(it.c), f=num(it.f), w=num(it.w);
+    if(it.meal==='sp'){ r.spG+=g0; r.spK+=g0*(k||0)/100; return; }
     if(!g0) r.noG.push(it.name||'Unnamed');
     if(k==null&&g0) r.noK.push(it.name||'Unnamed');
     var kc=g*(k||0)/100;
@@ -1738,12 +1742,12 @@ function menuCalc(m){
 }
 function food(){
   var f=L.food, days=N+(+f.spare||0), mc=menuCalc(fMenu());
-  if(mc){ var pd=Math.round(mc.gpd); return {perDay:pd,days:days,total:pd*days,kcal:Math.round(mc.kpd),dens:mc.dens,menu:mc}; }
+  if(mc){ var pd=Math.round(mc.gpd), sp=+f.spare||0, spD=mc.spG?Math.round(mc.spG):pd; return {perDay:pd,days:days,total:pd*N+spD*sp,spareDay:spD,ownSpare:!!mc.spG,kcal:Math.round(mc.kpd),dens:mc.dens,menu:mc}; }
   var perDay=Math.round(f.kcal/f.dens*100); return {perDay:perDay,days:days,total:perDay*days,kcal:+f.kcal,dens:+f.dens,menu:null};
 }
 
 var FOOD=(function(){
-  var newOpen=false, armed=null, busy=false, pick=null, pickAll=false, pickQ='', creating=false, shared=[], dbCol=null, dbState='off';
+  var impOpen=false, impMsg='', newOpen=false, armed=null, busy=false, pick=null, pickAll=false, pickQ='', creating=false, shared=[], dbCol=null, dbState='off';
   function itemFrom(o,meal,g,name){ return {id:fid(),meal:meal,name:name||o.name,g:g!=null?g:o.g,k:o.k,p:o.p,c:o.c,f:o.f,w:o.w||0,days:null}; }
   function starterItems(){ return FOOD_STARTER.map(function(x){ var o=libByName(x[1]); return itemFrom(o,x[0],x[3],x[2]||o.name); }); }
   function addMenu(kind){
@@ -1753,6 +1757,30 @@ var FOOD=(function(){
     else m.name='Menu '+(ms.length+1);
     ms.push(m); L.food.active=m.id; newOpen=false; pick=null; persist(); rerender();
   }
+  /* import a menu from text: "Meal; Food; grams[; kcal per 100 g]" per line, or rows copied from a tab in the group sheet */
+  function mealKey(t){ t=String(t||'').toLowerCase().trim();
+    return /^break/.test(t)?'bf':/^(lunch|second)/.test(t)?'lu':/^(trail|snack)/.test(t)?'sn':/^din/.test(t)?'di':/^drink/.test(t)?'dr':/^spare/.test(t)?'sp':null; }
+  function known(name){ var lo=String(name).toLowerCase().trim(), hit=null;
+    fMenus().forEach(function(m){ m.items.forEach(function(i){ if(!hit&&String(i.name).toLowerCase().trim()===lo&&num(i.k)!=null) hit=i; }); });
+    return hit; }
+  function importMenu(txt){
+    var lines=String(txt||'').split(/\r?\n/), name='', items=[], skipped=[];
+    lines.forEach(function(raw){ var l=raw.trim(); if(!l) return;
+      var mm=l.match(/^(?:dgt menu|menu|name)\s*:\s*(.+)$/i); if(mm){ name=mm[1].trim(); return; }
+      var f=l.indexOf('\t')>=0?l.split('\t'):l.split(/\s*[;|]\s*/), meal, nm, g, k=null;
+      if(f.length>=8&&/^food$/i.test(f[0])){ if(/^(meal|whole menu)$/i.test(f[1])) return; meal=mealKey(f[1]); nm=f[3]; g=num(f[7]); var kd=num(f[5]); if(kd!=null&&g) k=Math.round(kd/g*1000)/10; if(!name&&f[4]) name=f[4]; }
+      else { meal=mealKey(f[0]); nm=f[1]; g=num(f[2]); if(f[3]!=null&&f[3]!=='') k=num(f[3]); }
+      if(!meal||!nm||g==null){ skipped.push(l.slice(0,40)); return; }
+      var src=known(nm)||findLib(nm), it={id:fid(),meal:meal,name:nm.trim(),g:g,k:k!=null?k:(src?num(src.k):null),p:src?src.p:null,c:src?src.c:null,f:src?src.f:null,w:src&&src.w!=null?src.w:0,days:null};
+      if(k!=null&&src&&num(src.k)!=null&&Math.abs(k-src.k)>src.k*0.15){ it.c=null; it.f=null; it.p=null; }
+      items.push(it); });
+    if(!items.length){ impMsg='Nothing to import. Use one line per food: Meal; Food; grams a day.'; rerender(); return; }
+    var ms=fMenus(), m={id:fid(),name:(name||'Imported menu')+(ms.some(function(x){return x.name===name;})?' (2)':''),items:items};
+    ms.push(m); L.food.active=m.id; impOpen=false; newOpen=false; pick=null;
+    var noK=items.filter(function(i){return num(i.k)==null;}).length;
+    impMsg='Imported “'+m.name+'” with '+items.length+' foods.'+(noK?' '+noK+' need kcal per 100 g: they\'re marked below.':'')+(skipped.length?' Skipped '+skipped.length+' line'+(skipped.length>1?'s':'')+' that didn\'t read as Meal; Food; grams.':'')+(items.some(function(i){return i.meal==='sp';})&&!(+L.food.spare>0)?' Set spare days to 1 to carry the spare day.':'');
+    persist(); rerender(); }
+  function exportText(){ var m=fMenu(); return 'DGT menu: '+(m.name||'Menu')+'\n'+MEALS.map(function(ml){ return m.items.filter(function(i){return i.meal===ml[0]&&num(i.g);}).map(function(i){ return ml[1]+'; '+i.name+'; '+num(i.g)+(num(i.k)!=null?'; '+num(i.k):''); }).join('\n'); }).filter(Boolean).join('\n'); }
   function findIt(id){ var m=fMenu(); return m?m.items.filter(function(i){return i.id===id;})[0]:null; }
   /* older menus: fill in carbs, fat and hot water from the food list where the name matches */
   var FALIAS={'salami':'Salami / dry sausage','mama alles dehydrated dinner':'Mama Alles dehydrated meal','rusks (buttermilk)':'Rusks, buttermilk (Ouma)','prONutro':'ProNutro'};
@@ -1762,6 +1790,9 @@ var FOOD=(function(){
   function backfill(){ fMenus().forEach(function(m){ m.items.forEach(function(it){ if(it.c!=null) return; var o=findLib(it.name), k=num(it.k);
       if(o&&(k==null||Math.abs(k-o.k)<=o.k*0.15)){ it.c=o.c; it.f=o.f; if(it.w==null) it.w=o.w; if(it.p==null) it.p=o.p; } }); }); }
 
+  function impHTML(){ return '<div class="fd-imp"><label class="field">Paste a menu<textarea id="fd-imp-in" class="code" rows="8" placeholder="DGT menu: My menu&#10;Breakfast; Rolled oats (Jungle Oats); 80&#10;Dinner; Mama Alles dehydrated meal; 160&#10;Spare day; Macadamia nuts; 40" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea></label>'+
+    '<p class="note">One food per line: meal; food; grams a day, and optionally kcal per 100 g. Meals: Breakfast, Lunch, Trail snacks, Dinner, Drinks, Spare day. Rows copied from someone\'s tab in the group sheet work too. Foods you already use, or that are in the food list, get their values filled in.</p>'+
+    '<div class="toolbar"><button class="btn primary" data-fact="impgo">Import as a new menu</button><button class="btn ghost" data-fact="impcancel">Cancel</button></div></div>'; }
   function rowHTML(it){
     return '<div class="fd-row" data-fid="'+it.id+'">'+
       '<input class="fd-name" data-fd="name" value="'+esc(it.name)+'" aria-label="Food">'+
@@ -1773,7 +1804,7 @@ var FOOD=(function(){
       '<button class="fd-x" data-fact="del" aria-label="Remove '+esc(it.name)+'">×</button></div>';
   }
   /* ---- the food picker: grouped by food type, suggestions for this meal first ---- */
-  function catsFor(meal){ return FCATS.filter(function(c){ return c[2].indexOf(meal)>=0; }).map(function(c){return c[0];}); }
+  function catsFor(meal){ if(meal==='sp') return FCATS.map(function(c){return c[0];}); return FCATS.filter(function(c){ return c[2].indexOf(meal)>=0; }).map(function(c){return c[0];}); }
   function pickItems(meal){
     var q=pickQ.trim().toLowerCase(), rel=catsFor(meal), groups=[];
     var byName=q&&FLIB.concat(fMine(),shared).some(function(o){ return o.name.toLowerCase().indexOf(q)>=0; });
@@ -1869,15 +1900,17 @@ var FOOD=(function(){
     if(!m){
       body='<div class="card fd-start"><div class="eyebrow">Food calculator</div><h3>Start your menu</h3>'+
         '<p>List what you\'ll eat each day, with grams. The planner adds up calories, protein, carbs and fat, checks them against your target, works out the hot water you need, and uses the weight on the Weight tab.</p>'+
-        '<div class="toolbar"><button class="btn primary" data-fact="new" data-kind="starter">Start from the starter menu</button><button class="btn" data-fact="new" data-kind="empty">Start empty</button></div>'+
+        '<div class="toolbar"><button class="btn primary" data-fact="new" data-kind="starter">Start from the starter menu</button><button class="btn" data-fact="new" data-kind="empty">Start empty</button><button class="btn ghost" data-fact="impopen">Import a menu</button></div>'+(impOpen?impHTML():'')+(impMsg?'<p class="warnbox">'+esc(impMsg)+'</p>':'')+
         '<p class="note">The starter menu is the 10-day plan from Leon\'s master list: about 810 g and 3,450 kcal a day. Change anything in it.</p></div>';
     } else {
       var tabs='<div class="fd-tabs">'+ms.map(function(x){ return '<button class="fd-tab" data-fact="menu" data-mid="'+x.id+'" aria-pressed="'+(x.id===m.id)+'"><span id="fmn-'+x.id+'">'+esc(x.name||'Menu')+'</span></button>'; }).join('')+
         '<button class="fd-tab add" data-fact="newopen" aria-expanded="'+newOpen+'">+ New menu</button></div>'+
-        (newOpen?'<div class="fd-newbar"><span class="note">New menu from:</span><button class="btn" data-fact="new" data-kind="copy">A copy of this one</button><button class="btn" data-fact="new" data-kind="starter">The starter menu</button><button class="btn ghost" data-fact="new" data-kind="empty">Empty</button></div>':'');
+        (newOpen?'<div class="fd-newbar"><span class="note">New menu from:</span><button class="btn" data-fact="new" data-kind="copy">A copy of this one</button><button class="btn" data-fact="new" data-kind="starter">The starter menu</button><button class="btn ghost" data-fact="new" data-kind="empty">Empty</button><button class="btn ghost" data-fact="impopen">Import…</button></div>':'')+
+        (impOpen?impHTML():'')+(impMsg?'<p class="'+(/^Imported/.test(impMsg)?'okbox':'warnbox')+'" role="status">'+esc(impMsg)+'</p>':'');
       var meals=MEALS.map(function(ml){
         var its=m.items.filter(function(i){return i.meal===ml[0];});
-        return '<section class="fd-meal" data-meal="'+ml[0]+'"><div class="fd-mh"><h4>'+ml[1]+'</h4><span class="mono" id="fms-'+ml[0]+'"></span></div>'+
+        return '<section class="fd-meal'+(ml[0]==='sp'?' fd-spare':'')+'" data-meal="'+ml[0]+'"><div class="fd-mh"><h4>'+ml[1]+'</h4><span class="mono" id="fms-'+ml[0]+'"></span></div>'+
+          (ml[0]==='sp'?'<p class="note">What you carry for each spare day (set how many above). Leave it empty to carry a copy of an average day; a compact, dense spare day is lighter. It doesn\'t count in the daily averages.</p>':'')+
           '<div class="fd-rows">'+its.map(rowHTML).join('')+'</div>'+
           (pick===ml[0]?pickerHTML(ml[0]):'<button class="fd-addbtn" data-fact="pick" data-meal-add="'+ml[0]+'">+ Add to '+ml[1].toLowerCase()+'</button>')+'</section>';
       }).join('');
@@ -1887,7 +1920,7 @@ var FOOD=(function(){
         '<div class="fd-sum" id="fd-sum"></div><div id="fd-checks"></div>'+
         '<div class="fd-split" id="fd-split"></div>'+meals+
         '<p class="note">Values in the food list are typical for that kind of food: check the label on what you buy. “Days” is for foods you only carry on some days (one flavour of dinner, say); leave it empty for every day.</p>'+
-        '<div class="toolbar" style="margin-top:12px"><button class="btn" data-fact="shop">Copy shopping list</button><button class="btn ghost" data-fact="tsv">Copy for Google Sheets</button><span class="note" id="fd-msg" role="status"></span></div>'+
+        '<div class="toolbar" style="margin-top:12px"><button class="btn" data-fact="shop">Copy shopping list</button><button class="btn ghost" data-fact="tsv">Copy for Google Sheets</button><button class="btn ghost" data-fact="exp">Copy to share</button><span class="note" id="fd-msg" role="status"></span></div>'+
         '<textarea id="fd-out" class="code" rows="6" hidden readonly></textarea>'+
         '<div class="adv-ai" data-fdai><button class="btn" data-fact="ai">Ask Claude to check my menu</button><span class="note">Checks energy, balance and practical issues (cooking, cold, fuel) for this trip. Sends your menu only.</span><div class="adv-out" hidden></div></div></div>';
     }
@@ -1922,7 +1955,7 @@ var FOOD=(function(){
       '<div class="tile'+(short?' fd-short':'')+'"><div class="k">Energy a day</div><div class="v">'+fmt(fd.kcal)+'</div><div class="s">kcal · target '+fmt(t)+(t?' · '+(diff>=0?'+':'−')+fmt(Math.abs(diff)):'')+'</div></div>'+
       '<div class="tile"><div class="k">Food a day</div><div class="v">'+fmt(fd.perDay)+' g</div><div class="s">'+fmt(fd.dens)+' kcal per 100 g</div></div>'+
       '<div class="tile"><div class="k">Protein a day</div><div class="v">'+(mc.hasP?fmt(mc.ppd)+' g':'—')+'</div><div class="s">'+(mc.hasP&&bw?fmt(mc.ppd/bw,1)+' g per kg body weight':mc.hasP?'add body weight for g per kg':'add protein per 100 g')+'</div></div>'+
-      '<div class="tile"><div class="k">Food to carry</div><div class="v">'+fmt(fd.total/1000,2)+' kg</div><div class="s">'+fmt(fd.days,fd.days%1?1:0)+' days ('+N+' + '+fmt(+f.spare||0,(+f.spare||0)%1?1:0)+' spare)</div></div>'+
+      '<div class="tile"><div class="k">Food to carry</div><div class="v">'+fmt(fd.total/1000,2)+' kg</div><div class="s">'+fmt(fd.days,fd.days%1?1:0)+' days ('+N+' + '+fmt(+f.spare||0,(+f.spare||0)%1?1:0)+' spare'+(fd.ownSpare?', '+fmt(fd.spareDay)+' g each':'')+')</div></div>'+
       '<div class="tile"><div class="k">Hot water a day</div><div class="v">'+fmt(mc.wml/1000,1)+' L</div><div class="s">boiled for your menu · gas plan '+fmt(+P.litres_per_person_per_day||0,1)+' L</div></div>'+
       (function(){ var b=burnEst(); return '<div class="tile"><div class="k">Body weight by the end</div><div class="v">'+(b?(b.kg>0.05?'−'+fmt(b.kg,1)+' kg':'± 0 kg'):'—')+'</div><div class="s">'+(b?'burning about '+fmt(Math.round(b.perDay/50)*50)+' kcal a day':'add your body weight above')+'</div></div>'; })();
     $('fd-checks').innerHTML=checks(fd,mc).map(function(c){ return '<p class="'+(c[0]==='ok'?'okbox':'warnbox')+'">'+esc(c[1])+'</p>'; }).join('');
@@ -1937,9 +1970,9 @@ var FOOD=(function(){
       'The scale will show more at first: glycogen and the water stored with it go in the first days and come back within a few days of eating normally.</p>'+
       '<p class="note">Estimate from each day\'s distance, climb and descent, your body weight and your pack weight that day. Hard, trackless ground and cold push the real figure up; rest stops and an easy pace bring it down.</p></div>':'';
     $('fd-split').innerHTML=burnNote+macro+'<table class="t"><thead><tr><th>Meal</th><th class="r">g a day</th><th class="r">kcal a day</th><th class="r">Share</th><th class="fd-barh" aria-hidden="true"></th></tr></thead><tbody>'+
-      MEALS.map(function(ml){ var x=mc.meals[ml[0]]; return '<tr><td>'+ml[1]+'</td><td class="r">'+fmt(x.g)+'</td><td class="r">'+fmt(x.k)+'</td><td class="r">'+(mc.kpd?fmt(x.k/mc.kpd*100):0)+'%</td><td class="fd-barc"><i style="width:'+(x.k/mx*100).toFixed(1)+'%"></i></td></tr>'; }).join('')+
+      MEALS.filter(function(ml){return ml[0]!=='sp';}).map(function(ml){ var x=mc.meals[ml[0]]; return '<tr><td>'+ml[1]+'</td><td class="r">'+fmt(x.g)+'</td><td class="r">'+fmt(x.k)+'</td><td class="r">'+(mc.kpd?fmt(x.k/mc.kpd*100):0)+'%</td><td class="fd-barc"><i style="width:'+(x.k/mx*100).toFixed(1)+'%"></i></td></tr>'; }).join('')+
       '</tbody></table>';
-    MEALS.forEach(function(ml){ var e=$('fms-'+ml[0]), x=mc.meals[ml[0]]; if(e) e.textContent=x.g?fmt(x.g)+' g · '+fmt(x.k)+' kcal':''; });
+    MEALS.forEach(function(ml){ var e=$('fms-'+ml[0]), x=mc.meals[ml[0]]; if(ml[0]==='sp'){ if(e) e.textContent=mc.spG?fmt(mc.spG)+' g, '+fmt(mc.spK)+' kcal per spare day':''; return; } if(e) e.textContent=x.g?fmt(x.g)+' g · '+fmt(x.k)+' kcal':''; });
     bwNote();
   }
   function bwNote(){ var e=$('f-bw'); if(!e) return; var bw=num(L.food.bw);
@@ -1958,7 +1991,7 @@ var FOOD=(function(){
   }
   function copy(txt,msg){ var out=$('fd-out'), m=$('fd-msg'); out.value=txt;
     try{ navigator.clipboard.writeText(txt).then(function(){ out.hidden=true; m.textContent=msg; },function(){ out.hidden=false; out.select(); m.textContent='Select the text below and copy it.'; }); }catch(_){ out.hidden=false; out.select(); m.textContent='Select the text below and copy it.'; } }
-  function totalFor(it){ var f=L.food, sc2=N?(N+(+f.spare||0))/N:1; return Math.ceil((num(it.g)||0)*fDays(it)*sc2/5)*5; }
+  function totalFor(it){ var f=L.food, sp=+f.spare||0, own=(menuCalc(fMenu())||{}).spG; if(it.meal==='sp') return Math.ceil((num(it.g)||0)*sp/5)*5; var sc2=N?(N+(own?0:sp))/N:1; return Math.ceil((num(it.g)||0)*fDays(it)*sc2/5)*5; }
   function shopText(){ var m=fMenu(), f=L.food, fd=food();
     return 'DGT 2027 food: '+(m.name||'Menu')+'\n'+N+' trail days + '+fmt(+f.spare||0,1)+' spare · '+fmt(fd.kcal)+' kcal and '+fmt(fd.perDay)+' g a day · '+kg(fd.total)+' in total\n'+
       MEALS.map(function(ml){ var its=m.items.filter(function(i){return i.meal===ml[0]&&num(i.g);}); if(!its.length) return '';
@@ -1985,7 +2018,11 @@ var FOOD=(function(){
   function click(b){
     var a=b.dataset.fact, m=fMenu();
     if(a!=='rm'&&armed){ armed=null; var rb=document.querySelector('[data-fact="rm"]'); if(rb){ rb.textContent='Delete menu'; rb.classList.remove('armed'); } }
-    if(a==='new'){ addMenu(b.dataset.kind); return; }
+    if(a==='new'){ impMsg=''; addMenu(b.dataset.kind); return; }
+    if(a==='impopen'){ impOpen=!impOpen; impMsg=''; rerender(); var ti=$('fd-imp-in'); if(ti) ti.focus(); return; }
+    if(a==='impcancel'){ impOpen=false; impMsg=''; rerender(); return; }
+    if(a==='impgo'){ importMenu(($('fd-imp-in')||{}).value); return; }
+    if(a==='exp'){ copy(exportText(),'Menu copied. Anyone can paste it under + New menu, Import.'); return; }
     if(a==='newopen'){ newOpen=!newOpen; rerender(); return; }
     if(a==='menu'){ L.food.active=b.dataset.mid; newOpen=false; pick=null; persist(); rerender(); return; }
     if(a==='usesug'){ L.food.kcal=+b.dataset.v; persist(); rerender(); return; }
@@ -2201,10 +2238,10 @@ function gearRows(){ var rowsT=[['Setup','Category','Counts as','Item','Your ite
 window.DGT_gearRows=gearRows;
 /* rows for the person's tab in the group sheet: the gear list, then the active food menu (Setup "Food", so the gear totals ignore it) */
 function sheetRows(){ var r=gearRows(), m=fMenu(), fd=food(); if(!m||!m.items.length||!fd.menu) return r;
-  var sc=N?(N+(+L.food.spare||0))/N:1;
+  var sp0=+L.food.spare||0, sc=N?(N+(fd.ownSpare?0:sp0))/N:1;
   r.push(['','','','','','','','','']);
   r.push(['Food','Meal','Counts as','Food','Menu','kcal a day','Days','g a day','Total to carry (g)']);
-  m.items.forEach(function(i){ var g=num(i.g)||0, k=num(i.k), d=fDays(i); r.push(['Food',MEAL_NAME[i.meal]||i.meal,'Consumable',i.name,m.name||'Menu',k==null?'':Math.round(g*k/100*d/N),d,g,Math.round(g*d*sc)]); });
+  m.items.forEach(function(i){ var g=num(i.g)||0, k=num(i.k), d=fDays(i); if(i.meal==='sp'){ r.push(['Food','Spare day','Consumable',i.name,m.name||'Menu','',sp0,g,Math.round(g*sp0)]); return; } r.push(['Food',MEAL_NAME[i.meal]||i.meal,'Consumable',i.name,m.name||'Menu',k==null?'':Math.round(g*k/100*d/N),d,g,Math.round(g*d*sc)]); });
   r.push(['Food','Whole menu','Consumable','Daily average',m.name||'Menu',fd.kcal,fd.days,fd.perDay,fd.total]);
   return r; }
 window.DGT_sheetRows=sheetRows;
