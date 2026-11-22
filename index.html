@@ -699,10 +699,10 @@ nav.tb-groups a[aria-current="true"]{color:var(--ink);border-bottom-color:var(--
 @media print{.topbar{position:static}.tb-sub,.tb-stripes{display:none}}
 
 /* ==== topo lines behind every page (DS: contour hairlines as background, well under 30% weight) ==== */
-body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background:var(--ink);opacity:.075;
+body::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background:var(--ink);opacity:.16;
   -webkit-mask:var(--topo) center/cover no-repeat;mask:var(--topo) center/cover no-repeat}
 #app{position:relative;z-index:1}
-@media print{body::before{display:none}}
+@media print{body::after{display:none}}
 
 /* ==== your trip (Overview) ==== */
 .me{border-color:color-mix(in srgb,var(--sunset-gold) 45%,var(--contour))}
@@ -743,6 +743,10 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;bac
 }
 .plan h3{margin:0 0 4px}
 
+.fd-burn{margin-bottom:14px;padding:12px 14px;border:1px solid var(--contour);border-radius:var(--r-sm);background:var(--surface)}
+.fd-burn h4{margin:0 0 4px}
+.fd-burn p{margin:0 0 6px;max-width:75ch}
+
 /* ---- website: sign-in gate ---- */
 .gate{position:fixed;inset:0;z-index:200;background:var(--surface);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:max(24px,env(safe-area-inset-top)) 16px 24px}
 .gate::before{content:"";position:fixed;inset:0;z-index:-1;background:var(--ink);opacity:.1;-webkit-mask:var(--topo) center/cover no-repeat;mask:var(--topo) center/cover no-repeat}
@@ -763,7 +767,6 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;bac
 .dgt-bar span{flex:1 1 280px;min-width:0}
 .dgt-bar .btn{white-space:nowrap}
 
-.dgt-noai .adv-ai{display:none!important}
 </style>
 </head><body>
 <div id="gate" class="gate" hidden><form class="g-card" autocomplete="on">
@@ -989,6 +992,13 @@ function gasPlan(){
   items(lo,'g').forEach(function(it){ if(it.fuel){ var s=stOf(lo,it.id); have+=consOf(it,s); n+=isOn(it,s)?qtyOf(it,s):0; } });
   return {need:need,have:have,n:n,netEach:n?have/n:0,margin:have-need};
 }
+/* Rough energy use per trail day: walking about 0.5 kcal per kg (body + pack) per km, x1.35 for trackless grass and rock;
+   climbing as lifting body + pack at 25% muscle efficiency (0.00938 kcal per kg per m); descending about a third of that;
+   plus about 24 kcal per kg of body weight a day for the body at rest. Estimates within about +/-15%. */
+function burnEst(){ var bw=num(L.food.bw); if(!bw) return null; var pk=packByDay(cur()), tot=0, fd=food();
+  PLAN.stages.forEach(function(st,i){ var m=bw+((pk[i]&&pk[i].total)||0)/1000; tot+=0.5*m*st.dist*1.35+m*st.up*0.00938+0.3*m*st.down*0.00938+bw*24; });
+  var eat=fd.kcal*N, def=tot-eat; return {perDay:tot/N,total:tot,eat:eat,kg:def/7700,lo:(tot*0.85-eat)/7700,hi:(tot*1.15-eat)/7700}; }
+function lossText(b){ if(!b) return ''; if(b.hi<0.3) return 'roughly even'; return 'about '+fmt(Math.max(0,b.kg),1)+' kg lighter'; }
 function packByDay(lo){
   var s=summary(lo||cur()),f=food(),g=gasPlan(),out=[];
   var fuelBurn=s.fuel*Math.min(1,g.have?g.need/g.have:1);
@@ -1106,7 +1116,8 @@ var ME=(function(){
       (mc?stat('#food','Food a day',fmt(fd.kcal)+' kcal',fmt(fd.perDay)+' g · target '+fmt(t),short>50):stat('#food','Food a day','No menu','estimate: '+fmt(fd.perDay)+' g',true))+
       (gg?stat('#group','You\'re bringing',gg.items.length?gg.items.length+' item'+(gg.items.length>1?'s':''):'Nothing yet',gg.items.length?kg(gg.g)+' of group gear':(gg.open?gg.open+' essentials unclaimed':'all covered'),!gg.items.length&&gg.open>0)
           :stat('#group','You\'re bringing','—','sign in to see group gear'))+
-      stat('#prep','Before you go',prepDone+' of '+S.prep.length,prepLeft?prepLeft+' left':'all done',false);
+      stat('#prep','Before you go',prepDone+' of '+S.prep.length,prepLeft?prepLeft+' left':'all done',false)+
+      (function(){ var b=burnEst(); return b?stat('#food','By Bushman\'s Nek',(b.kg>0.05?'−'+fmt(b.kg,1)+' kg':'± 0 kg'),'body weight, from food vs effort',false):''; })();
     var todo=[];
     if(!nm) todo.push(['#trip','Put your name in the dates poll so the planner knows which answers and gear are yours']);
     if(poll===false) todo.push(['#trip','Answer the dates poll']);
@@ -1618,7 +1629,8 @@ var FOOD=(function(){
       '<div class="tile"><div class="k">Food a day</div><div class="v">'+fmt(fd.perDay)+' g</div><div class="s">'+fmt(fd.dens)+' kcal per 100 g</div></div>'+
       '<div class="tile"><div class="k">Protein a day</div><div class="v">'+(mc.hasP?fmt(mc.ppd)+' g':'—')+'</div><div class="s">'+(mc.hasP&&bw?fmt(mc.ppd/bw,1)+' g per kg body weight':mc.hasP?'add body weight for g per kg':'add protein per 100 g')+'</div></div>'+
       '<div class="tile"><div class="k">Food to carry</div><div class="v">'+fmt(fd.total/1000,2)+' kg</div><div class="s">'+fmt(fd.days,fd.days%1?1:0)+' days ('+N+' + '+fmt(+f.spare||0,(+f.spare||0)%1?1:0)+' spare)</div></div>'+
-      '<div class="tile"><div class="k">Hot water a day</div><div class="v">'+fmt(mc.wml/1000,1)+' L</div><div class="s">boiled for your menu · gas plan '+fmt(+P.litres_per_person_per_day||0,1)+' L</div></div>';
+      '<div class="tile"><div class="k">Hot water a day</div><div class="v">'+fmt(mc.wml/1000,1)+' L</div><div class="s">boiled for your menu · gas plan '+fmt(+P.litres_per_person_per_day||0,1)+' L</div></div>'+
+      (function(){ var b=burnEst(); return '<div class="tile"><div class="k">Body weight by the end</div><div class="v">'+(b?(b.kg>0.05?'−'+fmt(b.kg,1)+' kg':'± 0 kg'):'—')+'</div><div class="s">'+(b?'burning about '+fmt(Math.round(b.perDay/50)*50)+' kcal a day':'add your body weight above')+'</div></div>'; })();
     $('fd-checks').innerHTML=checks(fd,mc).map(function(c){ return '<p class="'+(c[0]==='ok'?'okbox':'warnbox')+'">'+esc(c[1])+'</p>'; }).join('');
     var mx=Math.max.apply(null,MEALS.map(function(ml){return mc.meals[ml[0]].k;}).concat([1]));
     var macro='';
@@ -1626,7 +1638,11 @@ var FOOD=(function(){
       macro='<div class="fd-macro"><div class="fd-mbar2" role="img" aria-label="Energy from carbohydrate '+fmt(pc)+'%, fat '+fmt(pf)+'%, protein '+fmt(pp)+'%"><i class="mc" style="width:'+pc.toFixed(1)+'%"></i><i class="mf" style="width:'+pf.toFixed(1)+'%"></i><i class="mp" style="width:'+pp.toFixed(1)+'%"></i></div>'+
         '<div class="fd-mleg"><span><i class="mc"></i>Carbohydrate '+fmt(pc)+'% · '+fmt(mc.cpd)+' g</span><span><i class="mf"></i>Fat '+fmt(pf)+'% · '+fmt(mc.fpd)+' g</span><span><i class="mp"></i>Protein '+fmt(pp)+'% · '+fmt(mc.ppd)+' g'+(bw?' ('+fmt(mc.ppd/bw,1)+' g/kg)':'')+'</span></div>'+
         '<p class="note">Where the energy comes from'+(cover<95?' (for the '+fmt(cover)+'% of calories with full label values)':'')+'. Expedition guidance: carbohydrate as the main fuel, fat around 30–40% to keep weight down, protein 1.2–2.0 g per kg body weight.</p></div>'; }
-    $('fd-split').innerHTML=macro+'<table class="t"><thead><tr><th>Meal</th><th class="r">g a day</th><th class="r">kcal a day</th><th class="r">Share</th><th class="fd-barh" aria-hidden="true"></th></tr></thead><tbody>'+
+    var bb=burnEst(), burnNote=bb?'<div class="fd-burn"><h4>Expected weight change</h4><p>On this route, with your pack, you\'ll burn very roughly <b>'+fmt(Math.round(bb.perDay/50)*50)+' kcal a day</b> (about '+fmt(Math.round(bb.total/1000))+',000 over '+N+' days) and eat about <b>'+fmt(fd.kcal)+'</b>. '+
+      (bb.kg>0.05?'That gap works out at <b>about '+fmt(bb.kg,1)+' kg</b> of body weight by Bushman\'s Nek (likely '+fmt(Math.max(0,bb.lo),1)+'–'+fmt(bb.hi,1)+' kg). ':'You\'re eating about what you\'ll burn. ')+
+      'The scale will show more at first: glycogen and the water stored with it go in the first days and come back within a few days of eating normally.</p>'+
+      '<p class="note">Estimate from each day\'s distance, climb and descent, your body weight and your pack weight that day. Hard, trackless ground and cold push the real figure up; rest stops and an easy pace bring it down.</p></div>':'';
+    $('fd-split').innerHTML=burnNote+macro+'<table class="t"><thead><tr><th>Meal</th><th class="r">g a day</th><th class="r">kcal a day</th><th class="r">Share</th><th class="fd-barh" aria-hidden="true"></th></tr></thead><tbody>'+
       MEALS.map(function(ml){ var x=mc.meals[ml[0]]; return '<tr><td>'+ml[1]+'</td><td class="r">'+fmt(x.g)+'</td><td class="r">'+fmt(x.k)+'</td><td class="r">'+(mc.kpd?fmt(x.k/mc.kpd*100):0)+'%</td><td class="fd-barc"><i style="width:'+(x.k/mx*100).toFixed(1)+'%"></i></td></tr>'; }).join('')+
       '</tbody></table>';
     MEALS.forEach(function(ml){ var e=$('fms-'+ml[0]), x=mc.meals[ml[0]]; if(e) e.textContent=x.g?fmt(x.g)+' g · '+fmt(x.k)+' kcal':''; });
@@ -1667,7 +1683,9 @@ var FOOD=(function(){
       '\n\nAnswer in plain text, no tables, under 280 words: 1) is the energy enough for this trip, and is the target itself sensible; 2) the balance of carbohydrate, fat and protein, and anything missing (salt, fibre, variety); 3) practical issues: food that gets hard, melts, goes off or crumbles, cooking time and fuel, appetite at altitude; 4) the three most useful changes, each with grams and the kcal or weight effect. Flag any kcal values that look wrong for that food.';
     busy=true; btn.disabled=true; out.textContent='Thinking…';
     try{ var r=await sample(prompt,{onText:function(p){ out.textContent=p.text; }}); out.textContent=r.text; }
-    catch(e){ out.textContent=e&&e.code==='rate_limited'?'No more Claude checks just now. Try again later.':'Couldn\'t get a check just now.'+(e&&e.text?'\n\n'+e.text:''); }
+    catch(e){ if(e&&e.code==='handoff'){ out.innerHTML='<a class="btn primary" href="'+esc(e.url)+'" target="_blank" rel="noopener">Open in Claude</a> <button class="btn ghost" type="button">Copy the question</button><p class="note">Opens a new chat in your own Claude account (the free plan works) with the question and your list filled in. If it opens empty, copy the question and paste it into Claude.</p>';
+      var cq=out.querySelector('button'); cq.onclick=function(){ try{ navigator.clipboard.writeText(e.prompt).then(function(){ cq.textContent='Copied'; },function(){}); }catch(_){} }; busy=false; btn.disabled=false; return; }
+      out.textContent=e&&e.code==='rate_limited'?'No more Claude checks just now. Try again later.':'Couldn\'t get a check just now.'+(e&&e.text?'\n\n'+e.text:''); }
     busy=false; btn.disabled=false; btn.textContent='Ask again';
   }
   function click(b){
@@ -2756,7 +2774,7 @@ var ADVICE=(function(){
     return '<div class="card adv"><div class="eyebrow">Gear check · '+esc(L.names[L.active])+'</div><h3>Weight, comfort and trip fit</h3>'+prioUI+fitUI+
       '<h4>Where you could save weight</h4>'+head+warn+list+kept+
       '<p class="note">Estimates against common lightweight gear. Safety kit (first aid, light, rain gear, navigation) is never counted as too heavy.</p>'+
-      '<div class="adv-ai" data-advai><button class="btn" data-act="adv-ai">Ask Claude for a full review</button><span class="note">Rates your main items for weight, comfort, reliability and fit for this trip, with your priorities. Sends item names and weights only. Uses the group\'s Claude allowance (a few reviews a day).</span><div class="adv-out" hidden></div></div></div>';
+      '<div class="adv-ai" data-advai><button class="btn" data-act="adv-ai">Ask Claude for a full review</button><span class="note">Rates your main items for weight, comfort, reliability and fit for this trip, with your priorities. Sends item names and weights only. Opens in your own Claude account.</span><div class="adv-out" hidden></div></div></div>';
   }
   var busy=false;
   async function ai(btn){
@@ -2772,7 +2790,9 @@ var ADVICE=(function(){
       '\n\nFor the pack, shelter, sleeping bag, mat, rain jacket, rain trousers, insulated jacket and footwear: give a line "Item — Weight x/5 · Comfort x/5 · Reliability x/5 · Trip fit x/5" and one sentence of reasoning that uses what you know about that specific model where you know it (say so if you don\'t). Then rank the 3 changes that would most improve the kit for this trip given their priorities (weight saved or comfort/safety gained). Then one line on anything that must not be cut. Plain text, no tables, under 320 words.';
     busy=true; btn.disabled=true; out.textContent='Thinking…';
     try{ var r=await sample(prompt,{onText:function(p){ out.textContent=p.text; }}); out.textContent=r.text; }
-    catch(e){ out.textContent=e&&e.code==='not_granted'?'Reviews aren\'t set up yet: the organiser needs to add a Claude API key.':e&&e.code==='rate_limited'?'The group\'s reviews for today are used up. Try again tomorrow.':'Couldn\'t get a review just now.'+(e&&e.text?'\n\n'+e.text:''); }
+    catch(e){ if(e&&e.code==='handoff'){ out.innerHTML='<a class="btn primary" href="'+esc(e.url)+'" target="_blank" rel="noopener">Open in Claude</a> <button class="btn ghost" type="button">Copy the question</button><p class="note">Opens a new chat in your own Claude account (the free plan works) with the question and your list filled in. If it opens empty, copy the question and paste it into Claude.</p>';
+      var cq=out.querySelector('button'); cq.onclick=function(){ try{ navigator.clipboard.writeText(e.prompt).then(function(){ cq.textContent='Copied'; },function(){}); }catch(_){} }; busy=false; btn.disabled=false; return; }
+      out.textContent=e&&e.code==='not_granted'?'Reviews aren\'t set up yet: the organiser needs to add a Claude API key.':e&&e.code==='rate_limited'?'The group\'s reviews for today are used up. Try again tomorrow.':'Couldn\'t get a review just now.'+(e&&e.text?'\n\n'+e.text:''); }
     busy=false; btn.disabled=false; btn.textContent='Ask again';
   }
   function setPrio(k,v){ L.prio=L.prio||{}; L.prio[k]=v; persist(); }
@@ -3074,7 +3094,11 @@ PEOPLE.start(); FOOD.start();
   sample.json=function(p,o){ return sample(p,o).then(function(r){ return JSON.parse(r.text); }); };
   sample.limits=async function(){ return {images:false}; };
 
-  window.claude={use:function(name){ return Promise.resolve(online?({db:db,user:user,artifact:artifact,self:artifact,sample:sample})[name]||null:null); }};
+  /* no Anthropic API key: Claude features open a chat in the person's own Claude account instead */
+  function handoff(prompt){ var q=typeof prompt==='string'?prompt:JSON.stringify(prompt); return Promise.reject({code:'handoff',prompt:q,url:'https://claude.ai/new?q='+encodeURIComponent(q)}); }
+  handoff.json=handoff; handoff.limits=async function(){ return {images:false}; };
+  var NOAI=(window.DGT_CONFIG||{}).ai===false;
+  window.claude={use:function(name){ if(name==='sample'&&NOAI) return Promise.resolve(handoff); return Promise.resolve(online?({db:db,user:user,artifact:artifact,self:artifact,sample:sample})[name]||null:null); }};
 
   /* ---- sign-in gate ---- */
   function bar(kind,detail){
