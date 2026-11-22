@@ -597,6 +597,47 @@ table.pp tr.out td{color:var(--ink-faint)}
 .adv-checks p{margin:2px 0 0;font-size:13.5px;color:var(--ink-muted);max-width:72ch}
 .adv h4{font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted);margin:12px 0 8px}
 
+/* ---- food calculator ---- */
+.fd-start p{max-width:62ch}
+.fd-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.fd-tab{font:inherit;font-family:var(--f-display);font-weight:500;letter-spacing:.06em;text-transform:uppercase;font-size:13px;padding:6px 12px;border:1px solid var(--ctl);border-radius:var(--r-sm);background:transparent;color:var(--ink-muted);cursor:pointer;min-height:36px}
+.fd-tab[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--sunset-gold);color:var(--ink)}
+.fd-tab.add{border-style:dashed;color:var(--accent-text)}
+.fd-newbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:-4px 0 12px}
+.fd-mbar{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px;margin-bottom:12px}
+.fd-mname{flex:1 1 220px;max-width:360px}
+.fd-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.fd-sum .tile{background:var(--surface)}
+.fd-sum .tile.fd-short .v{color:var(--bad-text)}
+#fd-checks p{margin:8px 0 0}
+.fd-split{margin-top:14px;overflow-x:auto}
+.fd-barh{width:34%}
+.fd-barc{vertical-align:middle!important}
+.fd-barc i{display:block;height:8px;border-radius:0 4px 4px 0;background:var(--c1)}
+.fd-meal{margin-top:18px;border-top:1px solid var(--contour);padding-top:10px}
+.fd-mh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+.fd-mh h4{margin:0;font-family:var(--f-display);font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:14px}
+.fd-mh span{font-size:12px;color:var(--ink-faint)}
+.fd-row{display:grid;grid-template-columns:minmax(0,1fr) 76px 84px 84px 60px 84px 34px;gap:8px;align-items:end;padding:6px 0;border-bottom:1px dashed var(--contour)}
+.fd-row input{font:inherit;font-size:14px;width:100%;min-width:0;box-sizing:border-box;padding:6px 8px;border:1px solid var(--ctl);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font-variant-numeric:tabular-nums}
+.fd-row input.need{border-color:var(--sunset-gold);background:var(--accent-soft)}
+.fd-in{display:flex;flex-direction:column;gap:2px;min-width:0}
+.fd-in span{font-family:var(--f-mono);font-size:10px;letter-spacing:.04em;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fd-kc{font-size:13px;text-align:right;padding-bottom:8px;color:var(--ink-muted);white-space:nowrap}
+.fd-x{font:inherit;font-size:20px;line-height:1;width:34px;height:34px;border:0;background:transparent;color:var(--ink-faint);cursor:pointer;border-radius:var(--r-sm)}
+.fd-x:hover{color:var(--bad-text);background:var(--accent-soft)}
+.fd-add{display:flex;gap:8px;margin-top:8px}
+.fd-add input{flex:1;min-width:0;font:inherit;font-size:14px;padding:7px 9px;border:1px dashed var(--ctl);border-radius:var(--r-sm);background:transparent;color:var(--ink)}
+#fd-out{width:100%;box-sizing:border-box;margin-top:8px;font-family:var(--f-mono);font-size:12px;background:var(--surface);color:var(--ink);border:1px solid var(--ctl);border-radius:var(--r-sm);padding:8px}
+@media (max-width:640px){
+  .fd-row{grid-template-columns:repeat(4,minmax(0,1fr)) auto 34px;row-gap:4px}
+  .fd-row .fd-name{grid-column:1/-1;font-weight:600}
+  .fd-in span{font-size:9px}
+  .fd-barh{width:22%}
+}
+
+.fd-top{margin-bottom:14px}.fd-gas{margin-top:14px;max-width:640px}
+
 /* ---- website: sign-in gate ---- */
 .gate{position:fixed;inset:0;z-index:200;background:var(--surface);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:max(24px,env(safe-area-inset-top)) 16px 24px}
 .gate::before{content:"";position:fixed;inset:0;z-index:-1;background:var(--ink);opacity:.1;-webkit-mask:var(--topo) center/cover no-repeat;mask:var(--topo) center/cover no-repeat}
@@ -808,7 +849,6 @@ function consOf(it,s){
   var tg=it.typ!=null?it.typ:it.g, defCons=(it.parts||[]).reduce(function(a,p){return a+(p.cons?(p.typ!=null?p.typ:p.g):0);},0), frac=tg?defCons/tg:0;
   return unitOf(it,s)*qtyOf(it,s)*frac;
 }
-function food(){var f=L.food,perDay=Math.round(f.kcal/f.dens*100),days=N+(+f.spare||0);return {perDay:perDay,days:days,total:perDay*days,kcal:f.kcal};}
 function summary(lo){
   var r={pBase:0,worn:0,consOther:0,big3:0,cats:{},gBase:0,gFuel:0,gcats:{},miss:[],gmiss:[]};
   items(lo).forEach(function(it){
@@ -1168,27 +1208,230 @@ function vCompare(){
 }
 
 /* ----- food ----- */
-function vFood(){
-  var g=gasPlan(), f=L.food;
-  return '<div class="head" style="padding-top:12px"><div><h2>Food &amp; fuel</h2><p class="note">Guides put a multi-day mountain trek at roughly 4,000–5,500 kcal a day. Well-packed trail food runs at about 400–500 kcal per 100 g. Water is what you carry at one time, not what you drink in a day.</p></div></div>'+
-  '<div class="grid2"><div class="card"><div class="fields">'+
-    '<label class="field">kcal per day<input type="number" step="100" min="1500" data-f="kcal" value="'+f.kcal+'"></label>'+
-    '<label class="field">kcal per 100 g<input type="number" step="10" min="200" max="700" data-f="dens" value="'+f.dens+'"></label>'+
-    '<label class="field">Spare days of food<input type="number" step="0.5" min="0" max="3" data-f="spare" value="'+f.spare+'"></label>'+
-    '<label class="field">Water carried, litres<input type="number" step="0.5" min="0" max="4" data-f="water" value="'+f.water+'"></label>'+
-  '</div><div style="margin-top:14px"><div class="sum-row"><span>Food per day</span><b id="f-day"></b></div>'+
-  '<div class="sum-row"><span>Days of food ('+N+' + spare)</span><b id="f-days"></b></div>'+
-  '<div class="sum-row"><span>Total food to carry</span><b id="f-total"></b></div>'+
-  '<div class="sum-row" style="border:0"><span>Total energy</span><b id="f-kcal"></b></div></div></div>'+
-  '<div class="card"><h3 style="margin-bottom:8px">Group gas</h3>'+
-    '<div class="sum-row"><span>Canisters on the Group gear list</span><b>'+g.n+' × '+fmt(g.netEach)+' g gas</b></div>'+
-    '<div class="sum-row"><span>Water to boil each</span><b>'+P.litres_per_person_per_day+' L a day × '+(N-1)+' stove days</b></div>'+
-    '<div class="sum-row"><span>Burn rate, measured</span><b>'+P.group_g_per_litre_measured+' g per litre</b></div>'+
-    '<div class="sum-row" style="border:0"><span>Group need for '+L.groupSize+' people</span><b>'+fmt(g.need)+' g of '+fmt(g.have)+' g</b></div>'+
-    '<div class="'+(g.margin>=0?'okbox':'warnbox')+'">'+(g.margin>=0?'About '+fmt(g.margin)+' g spare across the group'+(g.have?', roughly '+fmt(g.margin/g.have*100)+'%.':'.'):'Short by about '+fmt(-g.margin)+' g. Add a canister on the Group gear tab.')+'</div>'+
-    '<p class="note">'+esc(P.burners||'')+'. The day-by-day pack chart is on the <a href="#weight">Weight</a> tab.</p></div></div>';
+/* Each person builds one or more menus (daily ration plans). The active menu drives the food weight everywhere else
+   (Weight tab, pack chart, weight advice). Without a menu, the quick estimate (kcal a day ÷ kcal per 100 g) is used. */
+var MEALS=[['bf','Breakfast'],['lu','Lunch'],['sn','Trail snacks'],['di','Dinner'],['dr','Drinks']];
+var MEAL_NAME={}; MEALS.forEach(function(m){ MEAL_NAME[m[0]]=m[1]; });
+/* Typical values per 100 g dry weight (kcal, protein g), and a usual daily portion in grams. Brands vary: check the pack. */
+var FOODLIB=[
+  ['bf','Rolled oats',375,13,80],['bf','Instant oats sachets',380,10,70],['bf','Granola / muesli',450,10,90],['bf','ProNutro',380,20,70],
+  ['bf','Rusks (buttermilk)',420,8,60],['bf','Full-cream milk powder (Nido)',500,25,25],['bf','Nuts & chia mix',600,18,25],
+  ['bf','Honey',304,0,20],['bf','Freeze-dried berries',350,5,10],['bf','Honey & freeze-dried berries',320,1,20],['bf','Coconut milk powder',690,7,20],
+  ['lu','Beef biltong',310,55,75],['lu','Droëwors',480,40,50],['lu','Salami',450,25,50],['lu','Tuna in olive oil (pouch)',190,25,80],
+  ['lu','Flour tortilla wraps',310,8,80],['lu','Crackers / crispbread',420,12,50],['lu','Bagel',270,10,90],
+  ['lu','Mature cheddar',415,25,40],['lu','Parmesan',400,33,30],['lu','Dehydrated hummus',420,18,20],['lu','Peanut butter',600,25,40],['lu','Nut butter sachet',610,22,32],
+  ['sn','Roasted salted mixed nuts',620,20,65],['sn','Macadamia nuts',740,8,40],['sn','Peanuts & raisins',470,15,60],['sn','Trail mix',480,13,60],
+  ['sn','Dark chocolate 85%',580,10,30],['sn','Milk chocolate',540,7,40],['sn','Peanut chocolate sweets',520,9,45],['sn','Jelly sweets',340,4,40],
+  ['sn','Dried mango & apricots',320,2,25],['sn','Coconut chips',650,7,30],['sn','Flapjack / energy bar',440,12,40],['sn','Protein bar',380,30,50],
+  ['di','Mama Alles dehydrated dinner',430,15,160],['di','Freeze-dried meal (Trek\'n Eat type)',450,18,150],['di','Instant noodles',450,9,85],
+  ['di','Couscous',360,13,100],['di','Instant mash',350,8,80],['di','Instant rice',360,7,100],['di','Olive oil',884,0,20],['di','Ghee',880,0,20],
+  ['dr','Ground coffee / drip bags',20,0,15],['dr','Instant coffee',100,8,6],['dr','Tea / rooibos',0,0,4],['dr','Electrolyte drink powder',260,0,15],
+  ['dr','Hot chocolate mix',400,6,25],['dr','Instant soup',380,6,20],['dr','Recovery shake powder',380,25,40]
+];
+/* Starting point: the 10-day menu from Leon's master gear list (Food List & Shopping Plan tab).
+   Breakfast had no calories in the sheet; typical values are filled in here. */
+var FOOD_STARTER=[
+  ['bf','Rolled oats (Jungle Oats)',80,375,13],['bf','Full-cream milk powder (Nido)',25,500,25],['bf','Nuts & chia mix',25,600,18],['bf','Honey & freeze-dried berries',20,320,1],
+  ['lu','Beef biltong',75,310,55],['lu','Droëwors',50,480,40],['lu','Flour tortilla wraps (2)',80,310,8],['lu','Mature cheddar / parmesan',40,415,25],['lu','Dehydrated hummus (Mama Alles)',20,420,18],
+  ['sn','Roasted salted mixed nuts',65,620,20],['sn','Dark chocolate 85%',30,580,10],['sn','Dried mango & apricots',25,320,2],['sn','Flapjack / energy bar (1)',40,440,12],
+  ['di','Mama Alles dinner (peanut, dhal, jolof, tagine)',160,430,15],['di','Olive oil (into dinner)',20,884,0],
+  ['dr','Ground coffee / drip bags',15,20,0],['dr','Electrolyte drink powder',15,260,0],['dr','Hot chocolate mix',25,400,6]
+];
+function fid(){ return 'f'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function fMenus(){ var f=L.food; if(!f.menus) f.menus=[]; return f.menus; }
+function fMenu(){ var ms=fMenus(); if(!ms.length) return null; return ms.filter(function(m){return m.id===L.food.active;})[0]||ms[0]; }
+function fDays(it){ var d=num(it.days); return d==null?N:Math.max(0,Math.min(d,N)); }
+function menuCalc(m){
+  if(!m||!m.items||!m.items.length) return null;
+  var r={gpd:0,kpd:0,ppd:0,meals:{},noK:[],noG:[],hasP:false};
+  MEALS.forEach(function(x){ r.meals[x[0]]={g:0,k:0}; });
+  m.items.forEach(function(it){
+    var share=N?fDays(it)/N:1, g=(num(it.g)||0)*share, k=num(it.k), p=num(it.p);
+    if(!num(it.g)) r.noG.push(it.name||'Unnamed');
+    if(k==null&&num(it.g)) r.noK.push(it.name||'Unnamed');
+    var kc=g*(k||0)/100;
+    r.gpd+=g; r.kpd+=kc; if(p!=null){ r.ppd+=g*p/100; if(p>0) r.hasP=true; }
+    var ml=r.meals[it.meal]||(r.meals[it.meal]={g:0,k:0}); ml.g+=g; ml.k+=kc;
+  });
+  r.dens=r.gpd?r.kpd/r.gpd*100:0;
+  return r;
 }
-function updateFood(){var f=food(); if(!$('f-day')) return; $('f-day').textContent=fmt(f.perDay)+' g'; $('f-days').textContent=fmt(f.days,1); $('f-total').textContent=kg(f.total); $('f-kcal').textContent=fmt(f.kcal*f.days)+' kcal';}
+function food(){
+  var f=L.food, days=N+(+f.spare||0), mc=menuCalc(fMenu());
+  if(mc){ var pd=Math.round(mc.gpd); return {perDay:pd,days:days,total:pd*days,kcal:Math.round(mc.kpd),dens:mc.dens,menu:mc}; }
+  var perDay=Math.round(f.kcal/f.dens*100); return {perDay:perDay,days:days,total:perDay*days,kcal:+f.kcal,dens:+f.dens,menu:null};
+}
+
+var FOOD=(function(){
+  var newOpen=false, armed=null, busy=false;
+  function itemsFrom(list){ return list.map(function(x){ return {id:fid(),meal:x[0],name:x[1],g:x[2],k:x[3],p:x[4],days:null}; }); }
+  function addMenu(kind){
+    var ms=fMenus(), cur0=fMenu(), m={id:fid(),name:'',items:[]};
+    if(kind==='starter'){ m.items=itemsFrom(FOOD_STARTER); m.name='Starter menu'; }
+    else if(kind==='copy'&&cur0){ m.items=JSON.parse(JSON.stringify(cur0.items)).map(function(it){ it.id=fid(); return it; }); m.name=(cur0.name||'Menu')+' (copy)'; }
+    else m.name='Menu '+(ms.length+1);
+    ms.push(m); L.food.active=m.id; newOpen=false; persist(); rerender();
+  }
+  function findIt(id){ var m=fMenu(); return m?m.items.filter(function(i){return i.id===id;})[0]:null; }
+  function libFor(name){ var n=String(name||'').trim().toLowerCase(); return FOODLIB.filter(function(l){return l[1].toLowerCase()===n;})[0]||null; }
+
+  function rowHTML(it){
+    return '<div class="fd-row" data-fid="'+it.id+'">'+
+      '<input class="fd-name" data-fd="name" value="'+esc(it.name)+'" aria-label="Food">'+
+      '<label class="fd-in"><span>g a day</span><input data-fd="g" inputmode="decimal" value="'+(it.g==null?'':esc(it.g))+'"></label>'+
+      '<label class="fd-in"><span>kcal/100 g</span><input data-fd="k" inputmode="decimal" value="'+(it.k==null?'':esc(it.k))+'"'+(it.k==null&&num(it.g)?' class="need"':'')+'></label>'+
+      '<label class="fd-in"><span>protein/100 g</span><input data-fd="p" inputmode="decimal" value="'+(it.p==null?'':esc(it.p))+'"></label>'+
+      '<label class="fd-in"><span>days</span><input data-fd="days" inputmode="numeric" placeholder="all" value="'+(it.days==null?'':esc(it.days))+'"></label>'+
+      '<output class="fd-kc mono" id="fk-'+it.id+'"></output>'+
+      '<button class="fd-x" data-fact="del" aria-label="Remove '+esc(it.name)+'">×</button></div>';
+  }
+  function view(){
+    var f=L.food, m=fMenu(), ms=fMenus(), g=gasPlan();
+    var target='<div class="card"><h3 style="margin-bottom:8px">Your target</h3><div class="fields">'+
+      '<label class="field">kcal a day<input type="number" step="100" min="1500" data-f="kcal" value="'+f.kcal+'"></label>'+
+      '<label class="field">Body weight, kg<input type="number" step="1" min="35" max="160" data-f="bw" placeholder="optional" value="'+(f.bw||'')+'"></label>'+
+      '<label class="field">Spare days of food<input type="number" step="0.5" min="0" max="3" data-f="spare" value="'+f.spare+'"></label>'+
+      '<label class="field">Water carried, litres<input type="number" step="0.5" min="0" max="4" data-f="water" value="'+f.water+'"></label>'+
+      (m?'':'<label class="field">kcal per 100 g<input type="number" step="10" min="200" max="700" data-f="dens" value="'+f.dens+'"></label>')+
+      '</div><p class="note" id="f-bw"></p>'+
+      (m?'':'<div style="margin-top:10px"><div class="sum-row"><span>Food per day</span><b id="f-day"></b></div>'+
+        '<div class="sum-row"><span>Days of food ('+N+' + spare)</span><b id="f-days"></b></div>'+
+        '<div class="sum-row"><span>Total food to carry</span><b id="f-total"></b></div>'+
+        '<div class="sum-row" style="border:0"><span>Total energy</span><b id="f-kcal"></b></div>'+
+        '<p class="note">A quick estimate. Build a menu below to check it food by food.</p></div>')+'</div>';
+    var gas='<div class="card"><h3 style="margin-bottom:8px">Group gas</h3>'+
+      '<div class="sum-row"><span>Canisters on the Group gear list</span><b>'+g.n+' × '+fmt(g.netEach)+' g gas</b></div>'+
+      '<div class="sum-row"><span>Water to boil each</span><b>'+P.litres_per_person_per_day+' L a day × '+(N-1)+' stove days</b></div>'+
+      '<div class="sum-row"><span>Burn rate, measured</span><b>'+P.group_g_per_litre_measured+' g per litre</b></div>'+
+      '<div class="sum-row" style="border:0"><span>Group need for '+L.groupSize+' people</span><b>'+fmt(g.need)+' g of '+fmt(g.have)+' g</b></div>'+
+      '<div class="'+(g.margin>=0?'okbox':'warnbox')+'">'+(g.margin>=0?'About '+fmt(g.margin)+' g spare across the group'+(g.have?', roughly '+fmt(g.margin/g.have*100)+'%.':'.'):'Short by about '+fmt(-g.margin)+' g. Add a canister on the Group gear tab.')+'</div>'+
+      '<p class="note">'+esc(P.burners||'')+'. The day-by-day pack chart is on the <a href="#weight">Weight</a> tab.</p></div>';
+    var head='<div class="head" style="padding-top:12px"><div><h2>Food &amp; fuel</h2><p class="note">Build your own menu and check it has enough energy for '+N+' days on the escarpment. Guides put a multi-day mountain trek at roughly 4,000–5,500 kcal a day; well-packed trail food runs at about 400–500 kcal per 100 g. Your menu is yours: it\'s saved with your gear, not shared.</p></div></div>';
+    var body;
+    if(!m){
+      body='<div class="card fd-start"><div class="eyebrow">Food calculator</div><h3>Start your menu</h3>'+
+        '<p>List what you\'ll eat each day, with grams and calories. The planner adds it up, checks it against your target and uses the weight on the Weight tab.</p>'+
+        '<div class="toolbar"><button class="btn primary" data-fact="new" data-kind="starter">Start from the starter menu</button><button class="btn" data-fact="new" data-kind="empty">Start empty</button></div>'+
+        '<p class="note">The starter menu is the 10-day plan from Leon\'s master list: about 810 g and 3,450 kcal a day. Change anything in it.</p></div>';
+    } else {
+      var tabs='<div class="fd-tabs">'+ms.map(function(x){ return '<button class="fd-tab" data-fact="menu" data-mid="'+x.id+'" aria-pressed="'+(x.id===m.id)+'"><span id="fmn-'+x.id+'">'+esc(x.name||'Menu')+'</span></button>'; }).join('')+
+        '<button class="fd-tab add" data-fact="newopen" aria-expanded="'+newOpen+'">+ New menu</button></div>'+
+        (newOpen?'<div class="fd-newbar"><span class="note">New menu from:</span><button class="btn" data-fact="new" data-kind="copy">A copy of this one</button><button class="btn" data-fact="new" data-kind="starter">The starter menu</button><button class="btn ghost" data-fact="new" data-kind="empty">Empty</button></div>':'');
+      var meals=MEALS.map(function(ml){
+        var its=m.items.filter(function(i){return i.meal===ml[0];});
+        return '<section class="fd-meal" data-meal="'+ml[0]+'"><div class="fd-mh"><h4>'+ml[1]+'</h4><span class="mono" id="fms-'+ml[0]+'"></span></div>'+
+          its.map(rowHTML).join('')+
+          '<div class="fd-add"><input data-fadd="1" list="fd-lib-'+ml[0]+'" placeholder="Add to '+ml[1].toLowerCase()+', e.g. '+esc(FOODLIB.filter(function(l){return l[0]===ml[0];})[2][1].toLowerCase())+'" aria-label="Add food to '+ml[1]+'">'+
+          '<datalist id="fd-lib-'+ml[0]+'">'+FOODLIB.filter(function(l){return l[0]===ml[0];}).concat(FOODLIB.filter(function(l){return l[0]!==ml[0];})).map(function(l){return '<option value="'+esc(l[1])+'">';}).join('')+'</datalist>'+
+          '<button class="btn" data-fact="add">Add</button></div></section>';
+      }).join('');
+      body='<div class="card fd-menu">'+tabs+
+        '<div class="fd-mbar"><label class="field fd-mname">Menu name<input data-fd="mname" value="'+esc(m.name||'')+'"></label>'+
+        '<div class="toolbar"><button class="btn ghost" data-fact="rm">Delete menu</button></div></div>'+
+        '<div class="fd-sum" id="fd-sum"></div><div id="fd-checks"></div>'+
+        '<div class="fd-split" id="fd-split"></div>'+meals+
+        '<p class="note">Values in the food list are typical for that kind of food: check the label on what you buy. "Days" is for foods you only carry on some days (one flavour of dinner, say); leave it empty for every day.</p>'+
+        '<div class="toolbar" style="margin-top:12px"><button class="btn" data-fact="shop">Copy shopping list</button><button class="btn ghost" data-fact="tsv">Copy for Google Sheets</button><span class="note" id="fd-msg" role="status"></span></div>'+
+        '<textarea id="fd-out" class="code" rows="6" hidden readonly></textarea>'+
+        '<div class="adv-ai" data-fdai><button class="btn" data-fact="ai">Ask Claude to check my menu</button><span class="note">Checks energy, balance and practical issues (cooking, cold, fuel) for this trip. Sends your menu only.</span><div class="adv-out" hidden></div></div></div>';
+    }
+    return head+'<div class="fd-top">'+target+'</div>'+body+'<div class="fd-gas">'+gas+'</div>';
+  }
+  function checks(fd,mc){
+    var f=L.food, t=+f.kcal||0, out=[], gap=t-fd.kcal, bw=num(f.bw);
+    if(mc.noK.length) out.push(['warn','No calories yet for '+mc.noK.join(', ')+'. The totals are low until you add kcal per 100 g from the pack.']);
+    if(mc.noG.length) out.push(['warn','No grams yet for '+mc.noG.join(', ')+'.']);
+    if(gap>50){
+      out.push(['warn','Short by about '+fmt(gap)+' kcal a day against your '+fmt(t)+' kcal target. Closing it takes about '+fmt(gap/8.84)+' g of olive oil, '+fmt(gap/6.2)+' g of salted nuts or '+fmt(gap/5.8)+' g of dark chocolate a day (or a mix).']);
+    } else if(t&&fd.kcal>t*1.15) out.push(['ok','About '+fmt(fd.kcal-t)+' kcal a day over your target. Fine if you tend to be hungry on the hill; otherwise that\'s about '+fmt((fd.kcal-t)/fd.dens*100*fd.days)+' g you could leave out.']);
+    else if(t) out.push(['ok','On target: '+fmt(fd.kcal)+' kcal a day against '+fmt(t)+'.']);
+    if(fd.dens&&fd.dens<400){
+      var low=fMenu().items.filter(function(i){ return i.meal!=='dr'&&num(i.k)!=null&&num(i.g)>=20&&num(i.k)<400; }).sort(function(a,b){ return (num(b.g)*(400-num(b.k)))-(num(a.g)*(400-num(a.k))); }).slice(0,3);
+      out.push(['warn','At '+fmt(fd.dens)+' kcal per 100 g the food is on the heavy side. '+(low.length?'The least energy per gram: '+low.map(function(i){return i.name+' ('+fmt(num(i.k))+')';}).join(', ')+'. ':'')+'Nuts, nut butter, oil, chocolate and droëwors bring it up.']);
+    } else if(fd.dens>=400) out.push(['ok',fmt(fd.dens)+' kcal per 100 g: '+(fd.dens>=480?'very well packed.':'good for a trek. Above 450 is where the weight savings get noticeable.')]);
+    if(bw&&mc.hasP){ var pk=mc.ppd/bw; if(pk<1.2) out.push(['warn','Protein is about '+fmt(mc.ppd)+' g a day ('+fmt(pk,1)+' g per kg). Long mountain days usually call for 1.2–1.6 g per kg: biltong, droëwors, cheese, milk powder or a recovery shake help.']); }
+    if(!(+f.spare>0)) out.push(['warn','No spare food. Weather days happen on the Drakensberg escarpment: one spare day is the usual margin.']);
+    return out;
+  }
+  function refresh(){
+    if(!$('fd-sum')) { bwNote(); return; }
+    var m=fMenu(), fd=food(), mc=fd.menu, f=L.food, t=+f.kcal||0, bw=num(f.bw);
+    m.items.forEach(function(it){ var o=$('fk-'+it.id); if(!o) return; var g=num(it.g)||0, k=num(it.k); o.textContent=k==null?'—':fmt(g*k/100)+' kcal'; });
+    if(!mc){ $('fd-sum').innerHTML='<p class="empty">Add foods below to see the totals.</p>'; $('fd-checks').innerHTML=''; $('fd-split').innerHTML=''; MEALS.forEach(function(ml){ var e=$('fms-'+ml[0]); if(e) e.textContent=''; }); bwNote(); return; }
+    var diff=fd.kcal-t, short=t&&diff< -50;
+    $('fd-sum').innerHTML=
+      '<div class="tile'+(short?' fd-short':'')+'"><div class="k">Energy a day</div><div class="v">'+fmt(fd.kcal)+'</div><div class="s">kcal · target '+fmt(t)+(t?' · '+(diff>=0?'+':'−')+fmt(Math.abs(diff)):'')+'</div></div>'+
+      '<div class="tile"><div class="k">Food a day</div><div class="v">'+fmt(fd.perDay)+' g</div><div class="s">'+fmt(fd.dens)+' kcal per 100 g</div></div>'+
+      '<div class="tile"><div class="k">Protein a day</div><div class="v">'+(mc.hasP?fmt(mc.ppd)+' g':'—')+'</div><div class="s">'+(mc.hasP&&bw?fmt(mc.ppd/bw,1)+' g per kg body weight':mc.hasP?'add body weight for g per kg':'add protein per 100 g')+'</div></div>'+
+      '<div class="tile"><div class="k">Food to carry</div><div class="v">'+fmt(fd.total/1000,2)+' kg</div><div class="s">'+fmt(fd.days,fd.days%1?1:0)+' days ('+N+' + '+fmt(+f.spare||0,(+f.spare||0)%1?1:0)+' spare)</div></div>';
+    $('fd-checks').innerHTML=checks(fd,mc).map(function(c){ return '<p class="'+(c[0]==='ok'?'okbox':'warnbox')+'">'+esc(c[1])+'</p>'; }).join('');
+    var mx=Math.max.apply(null,MEALS.map(function(ml){return mc.meals[ml[0]].k;}).concat([1]));
+    $('fd-split').innerHTML='<table class="t"><thead><tr><th>Meal</th><th class="r">g a day</th><th class="r">kcal a day</th><th class="r">Share</th><th class="fd-barh" aria-hidden="true"></th></tr></thead><tbody>'+
+      MEALS.map(function(ml){ var x=mc.meals[ml[0]]; return '<tr><td>'+ml[1]+'</td><td class="r">'+fmt(x.g)+'</td><td class="r">'+fmt(x.k)+'</td><td class="r">'+(mc.kpd?fmt(x.k/mc.kpd*100):0)+'%</td><td class="fd-barc"><i style="width:'+(x.k/mx*100).toFixed(1)+'%"></i></td></tr>'; }).join('')+
+      '</tbody></table>';
+    MEALS.forEach(function(ml){ var e=$('fms-'+ml[0]), x=mc.meals[ml[0]]; if(e) e.textContent=x.g?fmt(x.g)+' g · '+fmt(x.k)+' kcal':''; });
+    bwNote();
+  }
+  function bwNote(){ var e=$('f-bw'); if(!e) return; var bw=num(L.food.bw);
+    e.textContent=bw?'At '+fmt(bw)+' kg, long days with a heavy pack at altitude burn very roughly '+fmt(Math.round(bw*50/100)*100)+'–'+fmt(Math.round(bw*60/100)*100)+' kcal (50–60 kcal per kg). Most people eat less than they burn on a trek: aim close, not necessarily all of it.':'Add your body weight for a rough target and a protein check.'; }
+  function input(t){
+    var m=fMenu(); if(!m) return;
+    if(t.dataset.fd==='mname'){ m.name=t.value; var tn=$('fmn-'+m.id); if(tn) tn.textContent=t.value||'Menu'; persist(); return; }
+    var row=t.closest('[data-fid]'); if(!row) return; var it=findIt(row.dataset.fid); if(!it) return; var k=t.dataset.fd;
+    if(k==='name') it.name=t.value;
+    else { var v=t.value.trim()===''?null:num(t.value); if(v!=null&&v<0) return; it[k]=v; if(k==='k') t.classList.toggle('need',v==null&&!!num(it.g)); }
+    persist(); refresh();
+  }
+  function copy(txt,msg){ var out=$('fd-out'), m=$('fd-msg'); out.value=txt;
+    try{ navigator.clipboard.writeText(txt).then(function(){ out.hidden=true; m.textContent=msg; },function(){ out.hidden=false; out.select(); m.textContent='Select the text below and copy it.'; }); }catch(_){ out.hidden=false; out.select(); m.textContent='Select the text below and copy it.'; } }
+  function totalFor(it){ var f=L.food, sc=N?(N+(+f.spare||0))/N:1; return Math.ceil((num(it.g)||0)*fDays(it)*sc/5)*5; }
+  function shopText(){ var m=fMenu(), f=L.food, fd=food();
+    return 'DGT 2027 food: '+(m.name||'Menu')+'\n'+N+' trail days + '+fmt(+f.spare||0,1)+' spare · '+fmt(fd.kcal)+' kcal and '+fmt(fd.perDay)+' g a day · '+kg(fd.total)+' in total\n'+
+      MEALS.map(function(ml){ var its=m.items.filter(function(i){return i.meal===ml[0]&&num(i.g);}); if(!its.length) return '';
+        return '\n'+ml[1]+'\n'+its.map(function(i){ return '- '+i.name+': '+fmt(totalFor(i))+' g ('+fmt(num(i.g))+' g × '+(i.days==null?'every day':fmt(fDays(i))+' days')+')'; }).join('\n'); }).join('')+'\n'; }
+  function tsv(){ var m=fMenu(), rows=[['Meal','Food','g a day','Days','kcal per 100 g','Protein per 100 g','kcal a day','Total to buy (g)']];
+    m.items.forEach(function(i){ var g=num(i.g)||0, k=num(i.k); rows.push([MEAL_NAME[i.meal]||i.meal,i.name,g,i.days==null?N:fDays(i),k==null?'':k,i.p==null?'':i.p,k==null?'':Math.round(g*k/100),totalFor(i)]); });
+    return rows.map(function(r){ return r.map(function(c){ return String(c).replace(/[\t\n]/g,' ').replace(/^[=+\-@]/,"'$&"); }).join('\t'); }).join('\n'); }
+  async function ai(btn){
+    if(busy) return; var box=btn.closest('[data-fdai]'), out=box.querySelector('.adv-out'); out.hidden=false;
+    var sample=null; try{ sample=window.claude&&claude.use?await claude.use('sample'):null; }catch(e){}
+    if(!sample){ out.textContent='Claude\'s menu check isn\'t available here right now. The numbers above work without it.'; return; }
+    var m=fMenu(), f=L.food, fd=food(), mc=fd.menu; if(!mc){ out.textContent='Add some foods first.'; return; }
+    var lines=m.items.map(function(i){ return (MEAL_NAME[i.meal]||i.meal)+' | '+i.name+' | '+(num(i.g)||0)+' g/day'+(i.days==null?'':' on '+fDays(i)+' of '+N+' days')+' | '+(num(i.k)==null?'kcal unknown':num(i.k)+' kcal/100 g')+(i.p==null?'':' | '+i.p+' g protein/100 g'); });
+    var prompt='You are an expedition nutritionist. Check this hiker\'s daily food plan for the Drakensberg Grand Traverse: about '+fmt(totalKm)+' km and '+fmt(totalUp)+' m of ascent over '+N+' days, unsupported, mostly trackless on the 2,800–3,400 m escarpment in March. Nights can drop below freezing, afternoons often bring storms; water is plentiful. They cook dinner and hot drinks on a shared gas stove and want to keep fuel use sensible.\n\n'+
+      'Target '+fmt(+f.kcal||0)+' kcal a day'+(num(f.bw)?', body weight '+num(f.bw)+' kg':'')+', '+fmt(+f.spare||0,1)+' spare day(s). The plan averages '+fmt(fd.kcal)+' kcal and '+fmt(fd.perDay)+' g a day ('+fmt(fd.dens)+' kcal per 100 g)'+(mc.hasP?', about '+fmt(mc.ppd)+' g protein':'')+'.\n\nItems (meal | food | grams | energy | protein):\n'+lines.join('\n')+
+      '\n\nAnswer in plain text, no tables, under 280 words: 1) is the energy enough for this trip, and is the target itself sensible; 2) the balance of carbohydrate, fat and protein, and anything missing (salt, fibre, variety); 3) practical issues: food that gets hard, melts, goes off or crumbles, cooking time and fuel, appetite at altitude; 4) the three most useful changes, each with grams and the kcal or weight effect. Flag any kcal values that look wrong for that food.';
+    busy=true; btn.disabled=true; out.textContent='Thinking…';
+    try{ var r=await sample(prompt,{onText:function(p){ out.textContent=p.text; }}); out.textContent=r.text; }
+    catch(e){ out.textContent=e&&e.code==='rate_limited'?'No more Claude checks just now. Try again later.':'Couldn\'t get a check just now.'+(e&&e.text?'\n\n'+e.text:''); }
+    busy=false; btn.disabled=false; btn.textContent='Ask again';
+  }
+  function click(b){
+    var a=b.dataset.fact, m=fMenu();
+    if(a!=='rm'&&armed){ armed=null; var rb=document.querySelector('[data-fact="rm"]'); if(rb){ rb.textContent='Delete menu'; rb.classList.remove('armed'); } }
+    if(a==='new'){ addMenu(b.dataset.kind); return; }
+    if(a==='newopen'){ newOpen=!newOpen; rerender(); return; }
+    if(a==='menu'){ L.food.active=b.dataset.mid; newOpen=false; persist(); rerender(); return; }
+    if(!m) return;
+    if(a==='rm'){ if(armed!==m.id){ armed=m.id; b.textContent='Tap again to delete “'+(m.name||'Menu')+'”'; b.classList.add('armed'); return; }
+      armed=null; L.food.menus=fMenus().filter(function(x){return x.id!==m.id;}); L.food.active=L.food.menus.length?L.food.menus[0].id:null; persist(); rerender(); return; }
+    if(a==='del'){ var id=b.closest('[data-fid]').dataset.fid; m.items=m.items.filter(function(i){return i.id!==id;}); persist(); var row=b.closest('.fd-row'); row.parentNode.removeChild(row); refresh(); return; }
+    if(a==='add'){ var sec=b.closest('[data-meal]'), inp=sec.querySelector('[data-fadd]'), name=inp.value.trim(); if(!name){ inp.focus(); return; }
+      var lib=libFor(name), it={id:fid(),meal:sec.dataset.meal,name:lib?lib[1]:name,g:lib?lib[4]:null,k:lib?lib[2]:null,p:lib?lib[3]:null,days:null};
+      m.items.push(it); persist(); rerender(); var nr=document.querySelector('[data-fid="'+it.id+'"] [data-fd="'+(lib?'g':'g')+'"]'); var again=document.querySelector('[data-meal="'+it.meal+'"] [data-fadd]');
+      if(!lib&&nr) nr.focus(); else if(again) again.focus(); return; }
+    if(a==='shop'){ copy(shopText(),'Copied the shopping list.'); return; }
+    if(a==='tsv'){ copy(tsv(),'Copied '+m.items.length+' rows. Paste into a sheet at cell A1.'); return; }
+    if(a==='ai'){ ai(b); return; }
+  }
+  return {view:view,refresh:refresh,input:input,click:click};
+})();
+function vFood(){ return FOOD.view(); }
+function updateFood(){
+  var f=food();
+  if($('f-day')){ $('f-day').textContent=fmt(f.perDay)+' g'; $('f-days').textContent=fmt(f.days,1); $('f-total').textContent=kg(f.total); $('f-kcal').textContent=fmt(f.kcal*f.days)+' kcal'; }
+  FOOD.refresh();
+}
 
 /* ----- trip ----- */
 var TYPES=['Flight','Accommodation','Transfer','Other'], STAT=['To book','Booked','Confirmed','Not needed'];
@@ -1285,6 +1528,8 @@ function bind(){
     else if(a==='spec'){ var sv=t.value===''?null:num(t.value); ADVICE.setSpec(t.dataset.k,sv); ADVICE.refreshFit(); }
     else if(a==='gload'){ var gl=num(t.value); L.groupLoad=t.value===''?null:gl; persist(); updateGear(); }
     else if(a==='days'){ var nd=+t.value; $('days-out').textContent=nd+' days'; clearTimeout(window._dt); window._dt=setTimeout(function(){ L.tripDays=nd===groupDays()?null:nd; persist(); setPlan(myDays()); MAP.replan(); renderRoute(viewEl('route')); var sl=document.querySelector('[data-act="days"]'); if(sl) sl.focus(); },120); }
+    else if(t.dataset.fd){ FOOD.input(t); }
+    else if(t.dataset.f==='bw'&&t.value===''){ delete L.food.bw; persist(); updateFood(); }
     else if(t.dataset.f){ var fv=num(t.value); if(fv!=null&&fv>=0){ L.food[t.dataset.f]=fv; persist(); updateFood(); } }
     else if(editing&&t.dataset.k){ draft[t.dataset.k]=t.value; }
     else if(editing&&t.dataset.b){ draft.bookings[+t.closest('[data-i]').dataset.i][t.dataset.b]=t.value; }
@@ -1293,10 +1538,12 @@ function bind(){
     if(e.key!=='Enter') return; var t=e.target, b=null;
     if(t.dataset.new) b=t.closest('.parts').querySelector('[data-act="padd"]');
     else if(t.dataset.ai) b=t.closest('.addin').querySelector('[data-act="ai-add"]');
+    else if(t.dataset.fadd) b=t.closest('.fd-add').querySelector('[data-fact="add"]');
     else if(t.id==='new-cat-name') b=document.querySelector('[data-act="cat-add"]');
     if(b){ e.preventDefault(); b.click(); }
   });
   app.addEventListener('click',function(e){
+    var fb=e.target.closest('[data-fact]'); if(fb){ FOOD.click(fb); return; }
     var tr=e.target.closest('[data-goday]'); if(tr){ location.hash='#day-'+tr.dataset.goday; var mb=document.querySelector('.mapbox'); if(mb) mb.scrollIntoView({block:'start'}); return; }
     var b=e.target.closest('button'); if(!b||b.closest('.rmap')) return;
     var a=b.dataset.act, row=b.closest('[data-id]')||(b.closest('[data-pfor]')&&{dataset:{id:b.closest('[data-pfor]').dataset.pfor}});
@@ -2097,8 +2344,8 @@ var ADVICE=(function(){
     if(optional.length){ var og=optional.reduce(function(a,o){return a+o[1];},0);
       tips.push({g:og,k:'leave',t:'Optional extras you\'re taking',x:optional.sort(function(a,b){return b[1]-a[1];}).map(function(o){return o[0]+' '+fmt(o[1])+' g';}).join(' · ')+'. Not on the essential list: keep the ones that earn their place.'}); }
     var f=L.food, fd=food();
-    if(+f.dens<500){ var lighter=Math.round(f.kcal/500*100)*fd.days; tips.push({g:fd.total-lighter,k:'food',t:'Food energy density',
-      x:'At '+fmt(f.dens)+' kcal per 100 g, '+fmt(f.kcal)+' kcal a day weighs '+fmt(fd.perDay)+' g. At 500 kcal per 100 g (more nuts, oils, nut butter, chocolate, dried meat) it would weigh '+fmt(Math.round(f.kcal/500*100))+' g a day.'}); }
+    if(fd.dens&&fd.dens<500){ var lighter=Math.round(fd.kcal/500*100)*fd.days; if(fd.total-lighter>0) tips.push({g:fd.total-lighter,k:'food',t:'Food energy density',
+      x:'At '+fmt(fd.dens)+' kcal per 100 g, '+fmt(fd.kcal)+' kcal a day weighs '+fmt(fd.perDay)+' g. At 500 kcal per 100 g (more nuts, oils, nut butter, chocolate, dried meat) it would weigh '+fmt(Math.round(fd.kcal/500*100))+' g a day.'+(fd.menu?' Your menu is on the Food & fuel tab.':'')}); }
     if(+f.spare>1) tips.push({g:(+f.spare-1)*fd.perDay,k:'food',t:'Spare food',x:'You\'re carrying '+fmt(f.spare)+' spare days. One spare day is the usual margin; each extra day is '+fmt(fd.perDay)+' g.'});
     if(+f.water>1.5) tips.push({g:(+f.water-1)*1000,k:'water',t:'Water at the start',x:'You start with '+fmt(f.water,1)+' L. Water is plentiful in March; carrying 1 L between sources saves '+fmt((+f.water-1)*1000)+' g.'});
     var gs=Math.max(1,+L.groupSize||1), even=s.group/gs;
