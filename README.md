@@ -27,7 +27,7 @@ The script creates a hidden `_data` tab for shared records. When someone switche
 ### 2. Point the website at it
 Edit `config.js` in this repo and paste the URL:
 ```js
-window.DGT_CONFIG = { apiUrl: 'https://script.google.com/macros/s/…/exec', names: ['Leon','Duncan','Christian','Stefan','Alex'] };
+window.DGT_CONFIG = { apiUrl: 'https://script.google.com/macros/s/…/exec', names: ['Leon','Duncan','Christian','Stefan'] };
 ```
 
 ### 3. Turn on GitHub Pages

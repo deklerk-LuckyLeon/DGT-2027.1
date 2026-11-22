@@ -7,7 +7,7 @@
  * Storage: a hidden tab "_data" holds every shared record (collection, id, JSON, updated).
  * Each person's shared gear list is also written as readable rows to their own tab.
  */
-var COLLECTIONS = ['datepoll', 'gclaims', 'gitems', 'gneed', 'people'];
+var COLLECTIONS = ['datepoll', 'gclaims', 'gitems', 'gneed', 'people', 'foods'];
 var DATA_TAB = '_data';
 var REVIEW_MODEL = 'claude-sonnet-5-5';
 var REVIEWS_PER_DAY = 20;
