@@ -687,6 +687,8 @@ table.pp tr.out td{color:var(--ink-faint)}
 .dgt-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px max(16px,env(safe-area-inset-left,0px));background:var(--accent-soft);border-bottom:1px solid var(--sunset-gold);font-size:14px;color:var(--ink)}
 .dgt-bar span{flex:1 1 280px;min-width:0}
 .dgt-bar .btn{white-space:nowrap}
+
+.dgt-noai .adv-ai{display:none!important}
 </style>
 </head><body>
 <div id="gate" class="gate" hidden><form class="g-card" autocomplete="on">
@@ -1758,6 +1760,15 @@ function gearRows(){ var rowsT=[['Setup','Category','Counts as','Item','Your ite
     rowsT.push([L.names[k],(it.scope==='g'?'Group: ':'')+it.cat,KIND[ci.kind]||'',it.name,(st.mine||'').trim(),on?'yes':'no',q,u,on?u*q:0]); }); });
   return rowsT; }
 window.DGT_gearRows=gearRows;
+/* rows for the person's tab in the group sheet: the gear list, then the active food menu (Setup "Food", so the gear totals ignore it) */
+function sheetRows(){ var r=gearRows(), m=fMenu(), fd=food(); if(!m||!m.items.length||!fd.menu) return r;
+  var sc=N?(N+(+L.food.spare||0))/N:1;
+  r.push(['','','','','','','','','']);
+  r.push(['Food','Meal','Counts as','Food','Menu','kcal a day','Days','g a day','Total to carry (g)']);
+  m.items.forEach(function(i){ var g=num(i.g)||0, k=num(i.k), d=fDays(i); r.push(['Food',MEAL_NAME[i.meal]||i.meal,'Consumable',i.name,m.name||'Menu',k==null?'':Math.round(g*k/100*d/N),d,g,Math.round(g*d*sc)]); });
+  r.push(['Food','Whole menu','Consumable','Daily average',m.name||'Menu',fd.kcal,fd.days,fd.perDay,fd.total]);
+  return r; }
+window.DGT_sheetRows=sheetRows;
 function importSheet(text){
   var rows=String(text).replace(/\r/g,'').split('\n').map(function(l){return l.split('\t');}).filter(function(r){return r.length>=9;});
   var h=rows[0]&&rows[0][0].trim().toLowerCase()==='setup'?rows.shift():null; if(!rows.length) return 0;
@@ -2925,7 +2936,7 @@ PEOPLE.start(); FOOD.start();
     if(m){ // personal gear: saved under the person's name, only when they choose to share it
       return {doc:function(){ return {
         get:async function(){ var g=(await call({a:'getgear'})).gear; return {exists:!!g,data:function(){return g;}}; },
-        set:async function(d){ if(lsg('dgt-share')!=='1') throw {code:'off'}; var rows=window.DGT_gearRows?window.DGT_gearRows():[]; await call({a:'gear',d:d,rows:rows}); },
+        set:async function(d){ if(lsg('dgt-share')!=='1') throw {code:'off'}; var rows=window.DGT_sheetRows?window.DGT_sheetRows():window.DGT_gearRows?window.DGT_gearRows():[]; await call({a:'gear',d:d,rows:rows}); },
         delete:async function(){ await call({a:'gear',d:null,rows:[]}); } }; } };
     }
     return {
@@ -2960,6 +2971,7 @@ PEOPLE.start(); FOOD.start();
     if(S.who) lss('dgt-poll-name',S.who);
     var src=document.getElementById('dgt-app'), s=document.createElement('script'); s.textContent=src.textContent; document.body.appendChild(s);
     document.documentElement.classList.toggle('dgt-signedin',online);
+    document.documentElement.classList.toggle('dgt-noai',(window.DGT_CONFIG||{}).ai===false);
     decorate(); poll();
     if(!online) bar(S.who&&S.k?'offline':'guest',start.err); else bar(null);
   }
@@ -2967,8 +2979,8 @@ PEOPLE.start(); FOOD.start();
     var paint=function(){ var card=document.querySelector('[data-act="backup"]'); if(!card) return; card=card.closest('.card'); if(!card||card.querySelector('.dgt-acct')) return;
       var box=document.createElement('div'); box.className='dgt-acct';
       box.innerHTML=online?('<p class="note">Signed in as <b></b>'+(S.isAdmin?' (organiser)':'')+'. <button class="linkbtn" data-dgt="out">Switch person</button></p>'+
-        '<label class="adv-chk"><input type="checkbox" id="dgt-share"'+(lsg('dgt-share')==='1'?' checked':'')+'> Save my gear to the group sheet under my name</label>'+
-        '<p class="note">On: your list follows you to any device you sign in on, and Leon\'s sheet shows it in your tab. Off: it stays in this browser only.</p>')
+        '<label class="adv-chk"><input type="checkbox" id="dgt-share"'+(lsg('dgt-share')==='1'?' checked':'')+'> Save my gear and food menu to the group sheet under my name</label>'+
+        '<p class="note">On: your gear and food follow you to any device you sign in on, and the group sheet shows them in your tab. Off: it stays in this browser only.</p>')
         :('<p class="note">Not signed in: shared parts are hidden and your gear stays in this browser. <button class="linkbtn" data-dgt="in">Sign in</button></p>');
       var b=box.querySelector('b'); if(b) b.textContent=S.who; card.appendChild(box); };
     paint(); new MutationObserver(paint).observe(document.getElementById('app'),{childList:true,subtree:true});
