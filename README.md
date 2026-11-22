@@ -31,7 +31,7 @@ window.DGT_CONFIG = { apiUrl: 'https://script.google.com/macros/s/…/exec', nam
 ```
 
 ### 3. Turn on GitHub Pages
-Repo **Settings → Pages → Build and deployment → Source: Deploy from a branch → Branch: main / (root)**. The site appears at `https://<user>.github.io/dgt-2027.1/` after a minute.
+Repo **Settings → Pages → Build and deployment → Source: Deploy from a branch → Branch: main / (root)**. The site appears at `https://<user>.github.io/DGT-2027.1/` after a minute.
 
 ### 4. Share
 Send the group the link and the passcode (separately is better). Everyone picks their name and enters the passcode. On phones, "Add to Home screen" makes it work like an app and keeps working offline with the last data it saw.
