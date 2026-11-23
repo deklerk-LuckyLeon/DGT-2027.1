@@ -72,7 +72,7 @@ cd src/app && python3 build5.py           # optional: Claude artifact version ->
 Edit files in `src/`, never the built `index.html`. Commit the source and the rebuilt `index.html` together; GitHub Pages serves the root of `main`.
 
 Notes:
-- The app code is plain ES5-style JavaScript in one IIFE-free file; views are string templates rendered by `renderView()`. Shared data goes through `claude.use('db')`, which `boot.js` maps onto the Apps Script web app (`backend/Code.gs`, records in the hidden `_data` tab, each person's gear and food written to their own tab).
+- The app is plain ES5-style JavaScript in one file, organised as module objects (FOOD, MAP, POLL, GG, ME…); views are string templates rendered by `renderView()`. Shared data goes through `claude.use('db')`, which `boot.js` maps onto the Apps Script web app (`backend/Code.gs`, records in the hidden `_data` tab, each person's gear and food written to their own tab).
 - `window.DGT_CONFIG` (from `config.js`) switches on website-only features: OpenTopoMap tiles, GPX download, the sign-in gate. Without it the same code runs as the Claude artifact.
 - Changing `Code.gs` needs a redeploy in Apps Script (Deploy → Manage deployments → edit → New version). The passcode, organiser code and API key are Script properties, never in this repo.
 - Test with Playwright against the mock server; the mock overrides `config.js`, so tests never touch the real sheet.
