@@ -1798,6 +1798,19 @@ var FOOD=(function(){
     var noK=items.filter(function(i){return num(i.k)==null;}).length;
     impMsg='Imported “'+m.name+'” with '+items.length+' foods.'+(noK?' '+noK+' need kcal per 100 g: they\'re marked below.':'')+(skipped.length?' Skipped '+skipped.length+' line'+(skipped.length>1?'s':'')+' that didn\'t read as Meal; Food; grams.':'')+(items.some(function(i){return i.meal==='sp';})&&!(+L.food.spare>0)?' Set spare days to 1 to carry the spare day.':'');
     persist(); rerender(); }
+  /* hand the menu over to the person's own Claude, with their numbers filled in; they paste the result back with Import */
+  function claudePrompt(){
+    var f=L.food, m=fMenu(), km=PLAN.stages.reduce(function(a,x){return a+x.dist;},0)/N, up=PLAN.stages.reduce(function(a,x){return a+x.up;},0)/N, bw=num(f.bw);
+    return 'Help me plan my food for the Drakensberg Grand Traverse: '+N+' days unsupported along the escarpment (mostly 2,900 to 3,400 m), about '+fmt(km)+' km and '+fmt(up)+' m of climbing a day, in March. '+
+      'I cook on a gas stove, boiling water only. We fill up water near camp, so only the dry food weight matters.\n\n'+
+      'My target: about '+fmt(+f.kcal||3600)+' kcal a day'+(bw?', body weight '+bw+' kg, so roughly '+fmt(bw*1.4)+' to '+fmt(bw*1.8)+' g of protein a day':'')+'. I want it as light as possible: high calories per gram, foods that keep for 10 days.\n\n'+
+      (m&&m.items.length?'Here is my current menu (meal; food; dry grams a day; then kcal, protein, carbs and fat per 100 g where known). Improve it, and tell me what you changed and why:\n\n'+exportText()+'\n\n':'Before you plan, ask me a few quick questions: foods I like, foods I don\'t eat, and brands I already have.\n\n')+
+      'Include one lighter emergency spare day (about 500 g, no cooking needed).\n\n'+
+      'Use DRY weights (as the food comes out of the pack, before water) and values per 100 g dry. When we are done, give me the final menu as plain text in exactly this format, one food per line, with nothing else in that block:\n\n'+
+      'DGT menu: <menu name>\nMeal; Food; dry grams per day; kcal per 100 g; protein per 100 g; carbs per 100 g; fat per 100 g\n\n'+
+      'Meal must be one of: Breakfast, Lunch, Trail snacks, Dinner, Drinks, Spare day.';
+  }
+  function claudeBtn(label){ return '<a class="btn" data-claude-menu href="https://claude.ai/new" target="_blank" rel="noopener">'+label+'</a>'; }
   function exportText(){ var m=fMenu(); return 'DGT menu: '+(m.name||'Menu')+'\n'+MEALS.map(function(ml){ return m.items.filter(function(i){return i.meal===ml[0]&&num(i.g);}).map(function(i){ return ml[1]+'; '+i.name+'; '+num(i.g)+(num(i.k)!=null?'; '+num(i.k)+(num(i.p)!=null||num(i.c)!=null||num(i.f)!=null?'; '+(num(i.p)!=null?num(i.p):'')+'; '+(num(i.c)!=null?num(i.c):'')+'; '+(num(i.f)!=null?num(i.f):''):''):''); }).join('\n'); }).filter(Boolean).join('\n'); }
   function findIt(id){ var m=fMenu(); return m?m.items.filter(function(i){return i.id===id;})[0]:null; }
   /* older menus: fill in carbs, fat and hot water from the food list where the name matches */
@@ -1809,7 +1822,7 @@ var FOOD=(function(){
       if(o&&(k==null||Math.abs(k-o.k)<=o.k*0.15)){ it.c=o.c; it.f=o.f; if(it.w==null) it.w=o.w; if(it.p==null) it.p=o.p; } }); }); }
 
   function impHTML(){ return '<div class="fd-imp"><label class="field">Paste a menu<textarea id="fd-imp-in" class="code" rows="8" placeholder="DGT menu: My menu&#10;Breakfast; Rolled oats (Jungle Oats); 80&#10;Dinner; Mama Alles dehydrated meal; 160&#10;Spare day; Macadamia nuts; 40" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea></label>'+
-    '<p class="note">One food per line: meal; food; dry grams a day, and optionally kcal, protein, carbs and fat per 100 g. Meals: Breakfast, Lunch, Trail snacks, Dinner, Drinks, Spare day. Rows copied from someone\'s tab in the group sheet work too. Foods you already use, or that are in the food list, get their values filled in.</p>'+
+    '<p class="note">Got a menu from Claude? Paste the block it gave you. One food per line: meal; food; dry grams a day, and optionally kcal, protein, carbs and fat per 100 g. Meals: Breakfast, Lunch, Trail snacks, Dinner, Drinks, Spare day. Rows copied from someone\'s tab in the group sheet work too. Foods you already use, or that are in the food list, get their values filled in.</p>'+
     '<div class="toolbar"><button class="btn primary" data-fact="impgo">Import as a new menu</button><button class="btn ghost" data-fact="impcancel">Cancel</button></div></div>'; }
   function rowHTML(it){
     return '<div class="fd-row" data-fid="'+it.id+'">'+
@@ -1943,12 +1956,13 @@ var FOOD=(function(){
     if(!m){
       body='<div class="card fd-start"><div class="eyebrow">Food calculator</div><h3>Start your menu</h3>'+
         '<p>List what you\'ll eat each day, with grams. The planner adds up calories, protein, carbs and fat, checks them against your target, and uses the weight on the Weight tab.</p>'+
-        '<div class="toolbar"><button class="btn primary" data-fact="new" data-kind="starter">Start from the starter menu</button><button class="btn" data-fact="new" data-kind="empty">Start empty</button><button class="btn ghost" data-fact="impopen">Import a menu</button></div>'+(impOpen?impHTML():'')+(impMsg?'<p class="warnbox">'+esc(impMsg)+'</p>':'')+
+        '<div class="toolbar"><button class="btn primary" data-fact="new" data-kind="starter">Start from the starter menu</button><button class="btn" data-fact="new" data-kind="empty">Start empty</button>'+claudeBtn('Plan my menu with Claude')+'<button class="btn ghost" data-fact="impopen">Import a menu</button></div>'+
+        '<p class="note">Plan my menu with Claude opens Claude in a new tab with your target filled in. When it gives you the final menu, copy it and come back to Import a menu.</p>'+(impOpen?impHTML():'')+(impMsg?'<p class="warnbox">'+esc(impMsg)+'</p>':'')+
         '<p class="note">The starter menu is the 10-day plan from Leon\'s master list: about 810 g and 3,450 kcal a day. Change anything in it.</p></div>';
     } else {
       var tabs='<div class="fd-tabs">'+ms.map(function(x){ return '<button class="fd-tab" data-fact="menu" data-mid="'+x.id+'" aria-pressed="'+(x.id===m.id)+'"><span id="fmn-'+x.id+'">'+esc(x.name||'Menu')+'</span></button>'; }).join('')+
         '<button class="fd-tab add" data-fact="newopen" aria-expanded="'+newOpen+'">+ New menu</button></div>'+
-        (newOpen?'<div class="fd-newbar"><span class="note">New menu from:</span><button class="btn" data-fact="new" data-kind="copy">A copy of this one</button><button class="btn" data-fact="new" data-kind="starter">The starter menu</button><button class="btn ghost" data-fact="new" data-kind="empty">Empty</button><button class="btn ghost" data-fact="impopen">Import…</button></div>':'')+
+        (newOpen?'<div class="fd-newbar"><span class="note">New menu from:</span><button class="btn" data-fact="new" data-kind="copy">A copy of this one</button><button class="btn" data-fact="new" data-kind="starter">The starter menu</button><button class="btn ghost" data-fact="new" data-kind="empty">Empty</button><button class="btn ghost" data-fact="impopen">Import…</button>'+claudeBtn('Plan with Claude')+'</div>':'')+
         (impOpen?impHTML():'')+(impMsg?'<p class="'+(/^Imported/.test(impMsg)?'okbox':'warnbox')+'" role="status">'+esc(impMsg)+'</p>':'');
       var meals=MEALS.map(function(ml){
         var its=m.items.filter(function(i){return i.meal===ml[0];});
@@ -1963,7 +1977,7 @@ var FOOD=(function(){
         '<div class="fd-sum" id="fd-sum"></div><div id="fd-checks"></div>'+
         '<div class="fd-split" id="fd-split"></div>'+meals+
         '<p class="note">Values in the food list are typical for that kind of food: check the label on what you buy. “Days” is for foods you only carry on some days (one flavour of dinner, say); leave it empty for every day.</p>'+
-        '<div class="toolbar" style="margin-top:12px"><button class="btn" data-fact="shop">Copy shopping list</button><button class="btn ghost" data-fact="tsv">Copy for Google Sheets</button><button class="btn ghost" data-fact="exp">Copy to share</button><span class="note" id="fd-msg" role="status"></span></div>'+
+        '<div class="toolbar" style="margin-top:12px"><button class="btn" data-fact="shop">Copy shopping list</button><button class="btn ghost" data-fact="tsv">Copy for Google Sheets</button><button class="btn ghost" data-fact="exp">Copy to share</button>'+claudeBtn('Improve this menu with Claude')+'<span class="note" id="fd-msg" role="status"></span></div>'+
         '<textarea id="fd-out" class="code" rows="6" hidden readonly></textarea>'+
         '<div class="adv-ai" data-fdai><button class="btn" data-fact="ai">Ask Claude to check my menu</button><span class="note">Checks energy, balance and practical issues (cooking, cold, fuel) for this trip. Sends your menu only.</span><div class="adv-out" hidden></div></div></div>';
     }
@@ -2096,8 +2110,10 @@ var FOOD=(function(){
           .filter(function(o){ return o.name&&o.k!=null&&!fMine().some(function(m){return m.name===o.name;}); });
         if(pick) redrawPick(); },function(){ dbState='err'; }); }catch(e){}
   }
-  return {view:view,refresh:refresh,input:input,click:click,choose:choose,start:start};
+  return {view:view,refresh:refresh,input:input,click:click,choose:choose,start:start,claudePrompt:claudePrompt};
 })();
+/* "Plan my menu with Claude": the link gets the person's prompt at the moment it's tapped */
+document.addEventListener('click',function(e){ var a=e.target.closest&&e.target.closest('a[data-claude-menu]'); if(a) a.href='https://claude.ai/new?q='+encodeURIComponent(FOOD.claudePrompt()); },true);
 function vFood(){ return FOOD.view(); }
 function updateFood(){
   var f=food();
