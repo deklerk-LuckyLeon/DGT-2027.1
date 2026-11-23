@@ -1,0 +1,21 @@
+
+/* ---- website: sign-in gate ---- */
+.gate{position:fixed;inset:0;z-index:200;background:var(--surface);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:max(24px,env(safe-area-inset-top)) 16px 24px}
+.gate::before{content:"";position:fixed;inset:0;z-index:-1;background:var(--ink);opacity:.1;-webkit-mask:var(--topo) center/cover no-repeat;mask:var(--topo) center/cover no-repeat}
+.g-card{width:min(420px,100%);background:var(--surface-raised);border:1px solid var(--contour);border-radius:var(--r-md);padding:24px;display:flex;flex-direction:column;gap:14px;margin-top:4vh}
+.g-card img{width:96px;height:96px;align-self:center}
+.g-card h1{font-size:28px;margin:0}
+.g-names{display:flex;flex-wrap:wrap;gap:6px}
+.g-name{font-family:var(--f-display);font-size:15px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;padding:8px 14px;border:1px solid var(--ctl);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);cursor:pointer}
+.g-name[aria-pressed="true"]{background:var(--sunset-gold);border-color:var(--sunset-gold);color:#222324}
+.g-card details summary{cursor:pointer;font-size:13px;color:var(--ink-muted)}
+.g-card details .field{margin-top:8px}
+.g-card .btn.primary{padding:10px 14px;font-size:14px}
+.g-skip{align-self:center;font-size:13px}
+.g-msg:empty{display:none}
+.dgt-acct{border-top:1px solid var(--contour);margin-top:12px;padding-top:10px}
+
+.dgt-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px max(16px,env(safe-area-inset-left,0px));background:var(--accent-soft);border-bottom:1px solid var(--sunset-gold);font-size:14px;color:var(--ink)}
+.dgt-bar span{flex:1 1 280px;min-width:0}
+.dgt-bar .btn{white-space:nowrap}
+

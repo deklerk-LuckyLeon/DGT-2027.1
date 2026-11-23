@@ -1,0 +1,162 @@
+{
+ "datesStatus": "Tentative",
+ "arrive": "",
+ "start": "2027-03-15",
+ "depart": "",
+ "notes": "The start week is set by the dates poll. Plan to arrive 2–3 days early to acclimatise.",
+ "bookings": [
+  {
+   "id": "b1",
+   "type": "Flight",
+   "title": "Flights to South Africa (out)",
+   "date": "",
+   "details": "",
+   "status": "To book",
+   "cost": ""
+  },
+  {
+   "id": "b2",
+   "type": "Transfer",
+   "title": "Shuttle Johannesburg → Witsieshoek Mountain Lodge",
+   "date": "2027-03-14",
+   "details": "About 4–5 hours by road. Operators on the Links page.",
+   "status": "To book",
+   "cost": ""
+  },
+  {
+   "id": "b3",
+   "type": "Accommodation",
+   "title": "Witsieshoek Mountain Lodge, night before Day 1",
+   "date": "2027-03-14",
+   "details": "Closest beds to Sentinel Car Park",
+   "status": "To book",
+   "cost": ""
+  },
+  {
+   "id": "b4",
+   "type": "Transfer",
+   "title": "Lodge shuttle to Sentinel Car Park",
+   "date": "2027-03-15",
+   "details": "Run by the lodge (R160 per person each way, 2026–27 rate). Buy the Witsieshoek day permit here.",
+   "status": "To book",
+   "cost": ""
+  },
+  {
+   "id": "b5",
+   "type": "Other",
+   "title": "Ezemvelo KZN Wildlife hiking permits",
+   "date": "2027-03-14",
+   "details": "Bought in person at an Ezemvelo office (e.g. Royal Natal) before the start; also covers rescue. Sign the mountain register.",
+   "status": "To book",
+   "cost": ""
+  },
+  {
+   "id": "b6",
+   "type": "Accommodation",
+   "title": "Night after the finish, near Bushman's Nek",
+   "date": "2027-03-24",
+   "details": "Bushman's Nek resort or Underberg area. Carry passports: there is a border post at Bushman's Nek.",
+   "status": "To book",
+   "cost": ""
+  },
+  {
+   "id": "b7",
+   "type": "Transfer",
+   "title": "Shuttle Bushman's Nek → Johannesburg",
+   "date": "2027-03-25",
+   "details": "About 6–7 hours. Underberg operators on the Links page.",
+   "status": "To book",
+   "cost": ""
+  },
+  {
+   "id": "b8",
+   "type": "Flight",
+   "title": "Flights home",
+   "date": "",
+   "details": "",
+   "status": "To book",
+   "cost": ""
+  }
+ ],
+ "tripDays": 10,
+ "links": [
+  {
+   "cat": "Shuttles",
+   "title": "Witsieshoek Mountain Lodge: getting here and the Sentinel shuttle",
+   "url": "https://witsieshoek.co.za/getting-here/",
+   "note": "Lodge to Sentinel Car Park shuttle, R160 per person each way (2026–27 rate)."
+  },
+  {
+   "cat": "Shuttles",
+   "title": "Aquella Travel shuttle service",
+   "url": "https://www.aquellatravel.com/shuttle-service/",
+   "note": "Johannesburg to the northern Drakensberg."
+  },
+  {
+   "cat": "Shuttles",
+   "title": "Champagne Shuttle and Coach Hire",
+   "url": "https://csch.co.za/",
+   "note": "Winterton-based; airport transfers and tailor-made group transport."
+  },
+  {
+   "cat": "Shuttles",
+   "title": "Underberg Express",
+   "url": "https://www.underbergexpress.co.za/",
+   "note": "Underberg shuttles and group transfers: the side Bushman's Nek is on."
+  },
+  {
+   "cat": "Shuttles",
+   "title": "Southern Berg Shuttle",
+   "url": "https://drakensberg.org/listing/southern-berg-shuttle/",
+   "note": "Underberg, Durban and King Shaka airport."
+  },
+  {
+   "cat": "Shuttles",
+   "title": "Soul Adventures: DGT with Joburg pick-up",
+   "url": "https://www.souladventures.co.za/tours/drakensberg-grand-traverse/",
+   "note": "Package that drives from Joburg to Sentinel and collects at Bushman's Nek. Worth asking about transport only."
+  },
+  {
+   "cat": "Accommodation",
+   "title": "Witsieshoek Mountain Lodge",
+   "url": "https://witsieshoek.co.za/",
+   "note": "The usual night before the start."
+  },
+  {
+   "cat": "Accommodation",
+   "title": "Bushman's Nek resort",
+   "url": "https://www.tripadvisor.com/ShowUserReviews-g312609-d1987261-r845291233-Bushman_s_Nek-Underberg_Drakensberg_Region_KwaZulu_Natal.html",
+   "note": "Hotel and self-catering right at the finish."
+  },
+  {
+   "cat": "Accommodation",
+   "title": "Sani Mountain Lodge (Sani Top)",
+   "url": "https://www.sanimountain.co.za/",
+   "note": "On the route at Sani Top: the main bail-out and the only resupply."
+  },
+  {
+   "cat": "Permits & planning",
+   "title": "Witsieshoek: hiking from the Sentinel side",
+   "url": "https://witsieshoek.co.za/drakensberg/",
+   "note": "Conservation and hiking fees for the Sentinel trail and chain ladders."
+  },
+  {
+   "cat": "Permits & planning",
+   "title": "DGT permits and maps (Hiking South Africa forum)",
+   "url": "https://community.hikingsouthafrica.co.za/t/drakensberg-grand-traverse-permits-and-maps/4167",
+   "note": "Ezemvelo permit bought at an office beforehand; Slingsby maps recommended."
+  },
+  {
+   "cat": "Permits & planning",
+   "title": "GT planning and logistics (Landlubbers)",
+   "url": "https://landlubbers.co.za/gt_planning-and-logistics/",
+   "note": "Roads, fees by jurisdiction, passports and the Bushman's Nek border post."
+  },
+  {
+   "cat": "Permits & planning",
+   "title": "Drakensberg without a car (Aquaterra)",
+   "url": "https://www.aquaterra.co.za/drakensberg-without-a-car/",
+   "note": "Overview of transfers and shuttles."
+  }
+ ]
+}

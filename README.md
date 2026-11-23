@@ -45,3 +45,34 @@ Send the group the link and the passcode (separately is better). Everyone picks 
 
 ## Updating the backend
 After editing Code.gs: **Deploy → Manage deployments → edit (pencil) → Version: New version → Deploy**. The URL stays the same.
+
+## Developing
+
+Everything the site is built from lives in `src/`. The site is one self-contained `index.html` (app, styles, route data and badge inlined), so there is no bundler: two small Python scripts stitch the sources together.
+
+```
+src/
+  app/    planner4_app.js (the whole app), planner_*.css + planner3_*.css (styles; planner_ds.css is the DGT design layer, applied last),
+          static5.json (days, catalogue, gas plan), d3b.json (route, terrain grids, caves, water, likely streams), trip.json (default trip details, bookings, links),
+          wx.json (weather normals), badge.webp, topo_mask.svg, the source GPX, build5.py (builds the Claude artifact version)
+  site/   build_site.py (builds this website into the repo root), boot.js (sign-in gate and the window.claude shim on top of Apps Script),
+          site.css, sw.js, manifest, icons, Code.gs (Apps Script backend, copied to backend/), README.md (this file, copied to the root)
+  test/   mockgas.js: runs Code.gs in Node with an in-memory sheet and serves the site on http://localhost:8765 (passcode berg2027, organiser code leon-org)
+  tools/  streams.py: works out likely stream crossings from the terrain grid and writes them into d3b.json
+```
+
+Build and run locally (Python 3, Node 18+):
+
+```
+cd src/site && python3 build_site.py      # writes ../../index.html, backend/Code.gs, README.md
+node src/test/mockgas.js                  # then open http://localhost:8765
+cd src/app && python3 build5.py           # optional: Claude artifact version -> build/dgt-planner.html
+```
+
+Edit files in `src/`, never the built `index.html`. Commit the source and the rebuilt `index.html` together; GitHub Pages serves the root of `main`.
+
+Notes:
+- The app code is plain ES5-style JavaScript in one IIFE-free file; views are string templates rendered by `renderView()`. Shared data goes through `claude.use('db')`, which `boot.js` maps onto the Apps Script web app (`backend/Code.gs`, records in the hidden `_data` tab, each person's gear and food written to their own tab).
+- `window.DGT_CONFIG` (from `config.js`) switches on website-only features: OpenTopoMap tiles, GPX download, the sign-in gate. Without it the same code runs as the Claude artifact.
+- Changing `Code.gs` needs a redeploy in Apps Script (Deploy → Manage deployments → edit → New version). The passcode, organiser code and API key are Script properties, never in this repo.
+- Test with Playwright against the mock server; the mock overrides `config.js`, so tests never touch the real sheet.
