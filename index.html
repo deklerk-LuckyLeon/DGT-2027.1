@@ -1786,10 +1786,11 @@ var FOOD=(function(){
       var mm=l.match(/^(?:dgt menu|menu|name)\s*:\s*(.+)$/i); if(mm){ name=mm[1].trim(); return; }
       var f=l.indexOf('\t')>=0?l.split('\t'):l.split(/\s*[;|]\s*/), meal, nm, g, k=null;
       if(f.length>=8&&/^food$/i.test(f[0])){ if(/^(meal|whole menu)$/i.test(f[1])) return; meal=mealKey(f[1]); nm=f[3]; g=num(f[7]); var kd=num(f[5]); if(kd!=null&&g) k=Math.round(kd/g*1000)/10; if(!name&&f[4]) name=f[4]; }
-      else { meal=mealKey(f[0]); nm=f[1]; g=num(f[2]); if(f[3]!=null&&f[3]!=='') k=num(f[3]); }
+      else { meal=mealKey(f[0]); nm=f[1]; g=num(f[2]); if(f[3]!=null&&f[3]!=='') k=num(f[3]); var mp=num(f[4]), mcb=num(f[5]), mf=num(f[6]); }
       if(!meal||!nm||g==null){ skipped.push(l.slice(0,40)); return; }
       var src=known(nm)||findLib(nm), it={id:fid(),meal:meal,name:nm.trim(),g:g,k:k!=null?k:(src?num(src.k):null),p:src?src.p:null,c:src?src.c:null,f:src?src.f:null,w:src&&src.w!=null?src.w:0,days:null};
       if(k!=null&&src&&num(src.k)!=null&&Math.abs(k-src.k)>src.k*0.15){ it.c=null; it.f=null; it.p=null; }
+      if(mp!=null) it.p=mp; if(mcb!=null) it.c=mcb; if(mf!=null) it.f=mf; mp=mcb=mf=null;
       items.push(it); });
     if(!items.length){ impMsg='Nothing to import. Use one line per food: Meal; Food; grams a day.'; rerender(); return; }
     var ms=fMenus(), m={id:fid(),name:(name||'Imported menu')+(ms.some(function(x){return x.name===name;})?' (2)':''),items:items};
@@ -1797,7 +1798,7 @@ var FOOD=(function(){
     var noK=items.filter(function(i){return num(i.k)==null;}).length;
     impMsg='Imported “'+m.name+'” with '+items.length+' foods.'+(noK?' '+noK+' need kcal per 100 g: they\'re marked below.':'')+(skipped.length?' Skipped '+skipped.length+' line'+(skipped.length>1?'s':'')+' that didn\'t read as Meal; Food; grams.':'')+(items.some(function(i){return i.meal==='sp';})&&!(+L.food.spare>0)?' Set spare days to 1 to carry the spare day.':'');
     persist(); rerender(); }
-  function exportText(){ var m=fMenu(); return 'DGT menu: '+(m.name||'Menu')+'\n'+MEALS.map(function(ml){ return m.items.filter(function(i){return i.meal===ml[0]&&num(i.g);}).map(function(i){ return ml[1]+'; '+i.name+'; '+num(i.g)+(num(i.k)!=null?'; '+num(i.k):''); }).join('\n'); }).filter(Boolean).join('\n'); }
+  function exportText(){ var m=fMenu(); return 'DGT menu: '+(m.name||'Menu')+'\n'+MEALS.map(function(ml){ return m.items.filter(function(i){return i.meal===ml[0]&&num(i.g);}).map(function(i){ return ml[1]+'; '+i.name+'; '+num(i.g)+(num(i.k)!=null?'; '+num(i.k)+(num(i.p)!=null||num(i.c)!=null||num(i.f)!=null?'; '+(num(i.p)!=null?num(i.p):'')+'; '+(num(i.c)!=null?num(i.c):'')+'; '+(num(i.f)!=null?num(i.f):''):''):''); }).join('\n'); }).filter(Boolean).join('\n'); }
   function findIt(id){ var m=fMenu(); return m?m.items.filter(function(i){return i.id===id;})[0]:null; }
   /* older menus: fill in carbs, fat and hot water from the food list where the name matches */
   var FALIAS={'salami':'Salami / dry sausage','mama alles dehydrated dinner':'Mama Alles dehydrated meal','rusks (buttermilk)':'Rusks, buttermilk (Ouma)','prONutro':'ProNutro'};
@@ -1808,7 +1809,7 @@ var FOOD=(function(){
       if(o&&(k==null||Math.abs(k-o.k)<=o.k*0.15)){ it.c=o.c; it.f=o.f; if(it.w==null) it.w=o.w; if(it.p==null) it.p=o.p; } }); }); }
 
   function impHTML(){ return '<div class="fd-imp"><label class="field">Paste a menu<textarea id="fd-imp-in" class="code" rows="8" placeholder="DGT menu: My menu&#10;Breakfast; Rolled oats (Jungle Oats); 80&#10;Dinner; Mama Alles dehydrated meal; 160&#10;Spare day; Macadamia nuts; 40" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea></label>'+
-    '<p class="note">One food per line: meal; food; grams a day, and optionally kcal per 100 g. Meals: Breakfast, Lunch, Trail snacks, Dinner, Drinks, Spare day. Rows copied from someone\'s tab in the group sheet work too. Foods you already use, or that are in the food list, get their values filled in.</p>'+
+    '<p class="note">One food per line: meal; food; dry grams a day, and optionally kcal, protein, carbs and fat per 100 g. Meals: Breakfast, Lunch, Trail snacks, Dinner, Drinks, Spare day. Rows copied from someone\'s tab in the group sheet work too. Foods you already use, or that are in the food list, get their values filled in.</p>'+
     '<div class="toolbar"><button class="btn primary" data-fact="impgo">Import as a new menu</button><button class="btn ghost" data-fact="impcancel">Cancel</button></div></div>'; }
   function rowHTML(it){
     return '<div class="fd-row" data-fid="'+it.id+'">'+
