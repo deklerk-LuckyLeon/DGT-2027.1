@@ -955,6 +955,9 @@ body{font-size:16px}
 .fd-wdays{margin-top:10px}
 .fd-wdays summary{cursor:pointer;font-weight:600;padding:6px 0}
 .fd-wdays table td{font-variant-numeric:tabular-nums}
+.fd-cgate{margin:12px 0;padding:14px 16px;border-radius:var(--r-sm);background:var(--accent-soft)}
+.fd-cgate h4{margin:0 0 4px;font-size:16px}
+.fd-imp .okbox{margin-top:0}
 
 /* ---- website: sign-in gate ---- */
 .gate{position:fixed;inset:0;z-index:200;background:var(--surface);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:max(24px,env(safe-area-inset-top)) 16px 24px}
@@ -1776,18 +1779,18 @@ var FOOD=(function(){
   }
   /* import a menu from text: "Meal; Food; grams[; kcal per 100 g]" per line, or rows copied from a tab in the group sheet */
   function mealKey(t){ t=String(t||'').toLowerCase().trim();
-    return /^break/.test(t)?'bf':/^(lunch|second)/.test(t)?'lu':/^(trail|snack)/.test(t)?'sn':/^din/.test(t)?'di':/^drink/.test(t)?'dr':/^spare/.test(t)?'sp':null; }
+    return /^break/.test(t)?'bf':/^(lunch|second)/.test(t)?'lu':/^(trail|snack)/.test(t)?'sn':/^(din|supper|dessert)/.test(t)?'di':/^(drink|hot drink|bever)/.test(t)?'dr':/^(spare|emergency)/.test(t)?'sp':null; }
   function known(name){ var lo=String(name).toLowerCase().trim(), hit=null;
     fMenus().forEach(function(m){ m.items.forEach(function(i){ if(!hit&&String(i.name).toLowerCase().trim()===lo&&num(i.k)!=null) hit=i; }); });
     return hit; }
   function importMenu(txt){
     var lines=String(txt||'').split(/\r?\n/), name='', items=[], skipped=[];
-    lines.forEach(function(raw){ var l=raw.trim(); if(!l) return;
+    lines.forEach(function(raw){ var l=raw.replace(/[*_`>]/g,'').replace(/^\s*(?:[-•–]|\d+[.)])\s+/,'').trim(); if(!l) return;
       var mm=l.match(/^(?:dgt menu|menu|name)\s*:\s*(.+)$/i); if(mm){ name=mm[1].trim(); return; }
       var f=l.indexOf('\t')>=0?l.split('\t'):l.split(/\s*[;|]\s*/), meal, nm, g, k=null;
       if(f.length>=8&&/^food$/i.test(f[0])){ if(/^(meal|whole menu)$/i.test(f[1])) return; meal=mealKey(f[1]); nm=f[3]; g=num(f[7]); var kd=num(f[5]); if(kd!=null&&g) k=Math.round(kd/g*1000)/10; if(!name&&f[4]) name=f[4]; }
       else { meal=mealKey(f[0]); nm=f[1]; g=num(f[2]); if(f[3]!=null&&f[3]!=='') k=num(f[3]); var mp=num(f[4]), mcb=num(f[5]), mf=num(f[6]); }
-      if(!meal||!nm||g==null){ skipped.push(l.slice(0,40)); return; }
+      if(!meal||!nm||g==null){ if(/[;|\t]/.test(l)&&!/^meal\b/i.test(l)) skipped.push(l.slice(0,40)); return; }
       var src=known(nm)||findLib(nm), it={id:fid(),meal:meal,name:nm.trim(),g:g,k:k!=null?k:(src?num(src.k):null),p:src?src.p:null,c:src?src.c:null,f:src?src.f:null,w:src&&src.w!=null?src.w:0,days:null};
       if(k!=null&&src&&num(src.k)!=null&&Math.abs(k-src.k)>src.k*0.15){ it.c=null; it.f=null; it.p=null; }
       if(mp!=null) it.p=mp; if(mcb!=null) it.c=mcb; if(mf!=null) it.f=mf; mp=mcb=mf=null;
@@ -1795,23 +1798,39 @@ var FOOD=(function(){
     if(!items.length){ impMsg='Nothing to import. Use one line per food: Meal; Food; grams a day.'; rerender(); return; }
     var ms=fMenus(), m={id:fid(),name:(name||'Imported menu')+(ms.some(function(x){return x.name===name;})?' (2)':''),items:items};
     ms.push(m); L.food.active=m.id; impOpen=false; newOpen=false; pick=null;
+    var spSet=items.some(function(i){return i.meal==='sp';})&&!(+L.food.spare>0); if(spSet) L.food.spare=1;
     var noK=items.filter(function(i){return num(i.k)==null;}).length;
-    impMsg='Imported “'+m.name+'” with '+items.length+' foods.'+(noK?' '+noK+' need kcal per 100 g: they\'re marked below.':'')+(skipped.length?' Skipped '+skipped.length+' line'+(skipped.length>1?'s':'')+' that didn\'t read as Meal; Food; grams.':'')+(items.some(function(i){return i.meal==='sp';})&&!(+L.food.spare>0)?' Set spare days to 1 to carry the spare day.':'');
+    impMsg='Imported “'+m.name+'” with '+items.length+' foods.'+(noK?' '+noK+' need kcal per 100 g: they\'re marked below.':'')+(skipped.length?' Skipped '+skipped.length+' line'+(skipped.length>1?'s':'')+' that didn\'t read as Meal; Food; grams.':'')+(spSet?' Spare days of food was 0, so it\'s now 1 to carry the spare day.':'');
     persist(); rerender(); }
   /* hand the menu over to the person's own Claude, with their numbers filled in; they paste the result back with Import */
-  function claudePrompt(){
+  function kcalSet(){ var f=L.food; return !!f.kcalSet||+f.kcal!==4500; }
+  function suggestKcal(){ var b=burnEst(); return b?Math.max(2800,Math.min(4800,Math.round(b.perDay*0.8/100)*100)):null; }
+  function claudeMissing(){ var m=[]; if(!num(L.food.bw)) m.push('bw'); if(!kcalSet()) m.push('kcal'); return m; }
+  function claudeGate(){ var miss=claudeMissing(), sg=suggestKcal();
+    return '<div class="fd-cgate" id="fd-cgate"><h4>Before Claude plans your menu</h4><p class="note">Claude plans around these two numbers, so it\'s worth setting them first.</p><div class="fields">'+
+      '<label class="field">Body weight, kg<input type="number" step="1" min="35" max="160" data-f="bw" value="'+(num(L.food.bw)||'')+'" placeholder="e.g. 75"></label>'+
+      '<label class="field">kcal a day<input type="number" step="100" min="1500" data-f="kcal" value="'+(+L.food.kcal||'')+'"></label></div>'+
+      '<p class="note" id="fd-csg">'+(sg?'Suggested: about '+fmt(sg)+' kcal a day (roughly 80% of what you\'ll burn). <button class="linkbtn" data-fact="usesg">Use '+fmt(sg)+'</button>':'Add your body weight for a suggested target.')+'</p>'+
+      '<div class="toolbar"><a class="btn primary" data-claude-menu data-go="1" href="https://claude.ai/new" target="_blank" rel="noopener">Continue to Claude</a><a class="btn ghost" data-claude-menu data-go="1" data-ask="1" href="https://claude.ai/new" target="_blank" rel="noopener">Skip, Claude can ask me</a><button class="btn ghost" data-fact="cgclose">Cancel</button></div></div>'; }
+  function claudePrompt(ask,lvl){ lvl=lvl||0;
     var f=L.food, m=fMenu(), km=PLAN.stages.reduce(function(a,x){return a+x.dist;},0)/N, up=PLAN.stages.reduce(function(a,x){return a+x.up;},0)/N, bw=num(f.bw);
     return 'Help me plan my food for the Drakensberg Grand Traverse: '+N+' days unsupported along the escarpment (mostly 2,900 to 3,400 m), about '+fmt(km)+' km and '+fmt(up)+' m of climbing a day, in March. '+
       'I cook on a gas stove, boiling water only. We fill up water near camp, so only the dry food weight matters.\n\n'+
-      'My target: about '+fmt(+f.kcal||3600)+' kcal a day'+(bw?', body weight '+bw+' kg, so roughly '+fmt(bw*1.4)+' to '+fmt(bw*1.8)+' g of protein a day':'')+'. I want it as light as possible: high calories per gram, foods that keep for 10 days.\n\n'+
-      (m&&m.items.length?'Here is my current menu (meal; food; dry grams a day; then kcal, protein, carbs and fat per 100 g where known). Improve it, and tell me what you changed and why:\n\n'+exportText()+'\n\n':'Before you plan, ask me a few quick questions: foods I like, foods I don\'t eat, and brands I already have.\n\n')+
+      (kcalSet()?'My target: about '+fmt(+f.kcal)+' kcal a day':'I haven\'t worked out my calorie target yet')+(bw?', body weight '+bw+' kg, so roughly '+fmt(bw*1.4)+' to '+fmt(bw*1.8)+' g of protein a day':'')+'.'+
+      (!bw||!kcalSet()?' Before planning, ask me for '+(!bw&&!kcalSet()?'my body weight, and suggest a daily calorie target from it':!bw?'my body weight':'a daily calorie target, suggesting one from my body weight')+'.':'')+' I want it as light as possible: high calories per gram, foods that keep for 10 days.\n\n'+
+      (m&&m.items.length&&lvl<2?'Here is my current menu (meal; food; dry grams a day'+(lvl?'':'; then kcal, protein, carbs and fat per 100 g where known')+'). Improve it, and tell me what you changed and why:\n\n'+exportText(!!lvl)+'\n\n':m&&m.items.length?'I\'ll paste my current menu in my next message; improve it then.\n\n':'Before you plan, ask me a few quick questions: foods I like, foods I don\'t eat, and brands I already have.\n\n')+
       'Include one lighter emergency spare day (about 500 g, no cooking needed).\n\n'+
       'Use DRY weights (as the food comes out of the pack, before water) and values per 100 g dry. When we are done, give me the final menu as plain text in exactly this format, one food per line, with nothing else in that block:\n\n'+
       'DGT menu: <menu name>\nMeal; Food; dry grams per day; kcal per 100 g; protein per 100 g; carbs per 100 g; fat per 100 g\n\n'+
       'Meal must be one of: Breakfast, Lunch, Trail snacks, Dinner, Drinks, Spare day.';
   }
+  function claudeUrl(ask){ var u; for(var l=0;l<3;l++){ u='https://claude.ai/new?q='+encodeURIComponent(claudePrompt(ask,l)); if(u.length<=7000) return {url:u,prompt:claudePrompt(ask,l),lvl:l}; } return {url:u,prompt:claudePrompt(ask,2),lvl:2}; }
+  function openGate(a){ var old=$('fd-cgate'); if(old) old.remove(); var tb=a.closest('.toolbar')||a.parentNode; tb.insertAdjacentHTML('afterend',claudeGate()); var g=$('fd-cgate'); if(g){ g.scrollIntoView({block:'nearest'}); var i=g.querySelector(num(L.food.bw)?'[data-f="kcal"]':'[data-f="bw"]'); if(i) i.focus({preventScroll:true}); } }
+  function gateRefresh(){ var e=$('fd-csg'); if(!e) return; var sg=suggestKcal(); e.innerHTML=sg?'Suggested: about '+fmt(sg)+' kcal a day (roughly 80% of what you\'ll burn). <button class="linkbtn" data-fact="usesg">Use '+fmt(sg)+'</button>':'Add your body weight for a suggested target.'; }
+  function claudeSent(lvl){ setTimeout(function(){ var g=$('fd-cgate'); if(g) g.remove(); impOpen=true; impMsg='';
+      rerender(); var box=document.querySelector('.fd-imp'); if(box){ box.insertAdjacentHTML('afterbegin','<p class="okbox" role="status">Claude opened in a new tab. The prompt is also copied: if Claude opens empty, paste it in.'+(lvl===2?' Your menu was too long to send in the link, so paste it into Claude after the prompt (Copy to share).':'')+' When Claude gives you the final menu, copy it and paste it below.</p>'); box.scrollIntoView({block:'nearest'}); } },400); }
   function claudeBtn(label){ return '<a class="btn" data-claude-menu href="https://claude.ai/new" target="_blank" rel="noopener">'+label+'</a>'; }
-  function exportText(){ var m=fMenu(); return 'DGT menu: '+(m.name||'Menu')+'\n'+MEALS.map(function(ml){ return m.items.filter(function(i){return i.meal===ml[0]&&num(i.g);}).map(function(i){ return ml[1]+'; '+i.name+'; '+num(i.g)+(num(i.k)!=null?'; '+num(i.k)+(num(i.p)!=null||num(i.c)!=null||num(i.f)!=null?'; '+(num(i.p)!=null?num(i.p):'')+'; '+(num(i.c)!=null?num(i.c):'')+'; '+(num(i.f)!=null?num(i.f):''):''):''); }).join('\n'); }).filter(Boolean).join('\n'); }
+  function exportText(compact){ var m=fMenu(); return 'DGT menu: '+(m.name||'Menu')+'\n'+MEALS.map(function(ml){ return m.items.filter(function(i){return i.meal===ml[0]&&num(i.g);}).map(function(i){ return ml[1]+'; '+i.name+'; '+num(i.g)+(num(i.k)!=null&&!compact?'; '+num(i.k)+(num(i.p)!=null||num(i.c)!=null||num(i.f)!=null?'; '+(num(i.p)!=null?num(i.p):'')+'; '+(num(i.c)!=null?num(i.c):'')+'; '+(num(i.f)!=null?num(i.f):''):''):''); }).join('\n'); }).filter(Boolean).join('\n'); }
   function findIt(id){ var m=fMenu(); return m?m.items.filter(function(i){return i.id===id;})[0]:null; }
   /* older menus: fill in carbs, fat and hot water from the food list where the name matches */
   var FALIAS={'salami':'Salami / dry sausage','mama alles dehydrated dinner':'Mama Alles dehydrated meal','rusks (buttermilk)':'Rusks, buttermilk (Ouma)','prONutro':'ProNutro'};
@@ -2094,6 +2113,8 @@ var FOOD=(function(){
     if(a==='pickall'||a==='pickrel'){ pickAll=a==='pickall'; b.parentNode.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed',String(x===b)); }); redrawPick(); return; }
     if(a==='newfood'){ creating=true; var el=document.querySelector('.fd-pick'); if(el){ el.outerHTML=pickerHTML(pick); var n=document.querySelector('.fp-new [data-nf="'+(pickQ?'k':'name')+'"]'); if(n) n.focus(); } return; }
     if(a==='nfcancel'){ creating=false; var el2=document.querySelector('.fd-pick'); if(el2) el2.outerHTML=pickerHTML(pick); return; }
+    if(a==='usesg'){ var sg=suggestKcal(); if(sg){ L.food.kcal=sg; L.food.kcalSet=true; persist(); document.querySelectorAll('[data-f="kcal"]').forEach(function(x){ x.value=sg; }); updateFood(); } return; }
+    if(a==='cgclose'){ var g=$('fd-cgate'); if(g) g.remove(); return; }
     if(a==='nfsave'){ saveNew(); return; }
     if(a==='nfmode'){ var bx=b.closest('.fp-new'); if(bx){ bx.dataset.mode=b.dataset.m; bx.querySelectorAll('[data-fact="nfmode"]').forEach(function(x){ x.setAttribute('aria-pressed',String(x===b)); }); } return; }
     if(a==='mdel'){ if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='Remove?'; b.classList.add('armed'); return; } delMine(b.dataset.id); return; }
@@ -2110,10 +2131,14 @@ var FOOD=(function(){
           .filter(function(o){ return o.name&&o.k!=null&&!fMine().some(function(m){return m.name===o.name;}); });
         if(pick) redrawPick(); },function(){ dbState='err'; }); }catch(e){}
   }
-  return {view:view,refresh:refresh,input:input,click:click,choose:choose,start:start,claudePrompt:claudePrompt};
+  return {view:view,refresh:refresh,input:input,click:click,choose:choose,start:start,claudePrompt:claudePrompt,claudeUrl:claudeUrl,missing:claudeMissing,openGate:openGate,gateRefresh:gateRefresh,claudeSent:claudeSent};
 })();
 /* "Plan my menu with Claude": the link gets the person's prompt at the moment it's tapped */
-document.addEventListener('click',function(e){ var a=e.target.closest&&e.target.closest('a[data-claude-menu]'); if(a) a.href='https://claude.ai/new?q='+encodeURIComponent(FOOD.claudePrompt()); },true);
+document.addEventListener('click',function(e){ var a=e.target.closest&&e.target.closest('a[data-claude-menu]'); if(!a) return;
+  if(!a.dataset.go&&FOOD.missing().length){ e.preventDefault(); FOOD.openGate(a); return; }
+  var r=FOOD.claudeUrl(!!a.dataset.ask); a.href=r.url;
+  try{ if(navigator.clipboard) navigator.clipboard.writeText(r.prompt).catch(function(){}); }catch(x){}
+  FOOD.claudeSent(r.lvl); },true);
 function vFood(){ return FOOD.view(); }
 function updateFood(){
   var f=food();
@@ -2219,7 +2244,7 @@ function bind(){
     else if(t.dataset.fd||t.dataset.fq){ FOOD.input(t); }
     else if(t.dataset.lk&&linkEdit){ var li=+t.closest('[data-li]').dataset.li; if(linkEdit[li]) linkEdit[li][t.dataset.lk]=t.value; }
     else if(t.dataset.f==='bw'&&t.value===''){ delete L.food.bw; persist(); updateFood(); }
-    else if(t.dataset.f){ var fv=num(t.value); if(fv!=null&&fv>=0){ L.food[t.dataset.f]=fv; persist(); updateFood(); } }
+    else if(t.dataset.f){ var fv=num(t.value); if(fv!=null&&fv>=0){ L.food[t.dataset.f]=fv; if(t.dataset.f==='kcal') L.food.kcalSet=true; persist(); updateFood(); if(t.dataset.f==='bw') FOOD.gateRefresh(); } }
     else if(editing&&t.dataset.k){ draft[t.dataset.k]=t.value; }
     else if(editing&&t.dataset.b){ draft.bookings[+t.closest('[data-i]').dataset.i][t.dataset.b]=t.value; }
   });
