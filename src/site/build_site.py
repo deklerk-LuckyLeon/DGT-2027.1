@@ -54,8 +54,11 @@ gate = '''<div id="gate" class="gate" hidden><form class="g-card" autocomplete="
 <p class="msg g-msg" role="status"></p>
 <button class="linkbtn g-skip" type="button">Look around without signing in</button>
 </form></div>'''
+import hashlib
+build = hashlib.sha1((js + css + boot + trip).encode('utf-8')).hexdigest()[:12]
 html = f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="dgt-build" content="{build}">
 <title>DGT Trip Planner</title>
 <meta name="theme-color" content="#222324">
 <link rel="manifest" href="manifest.webmanifest">

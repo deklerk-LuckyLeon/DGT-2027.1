@@ -1,5 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="dgt-build" content="74540e706f42">
 <title>DGT Trip Planner</title>
 <meta name="theme-color" content="#222324">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1917,7 +1918,7 @@ var FOOD=(function(){
     if(key[0]==='m'){ var id=key.slice(1); return fMine().filter(function(o){return o.id===id;})[0]; }
     return shared.filter(function(o){return o.key===key;})[0];
   }
-  function addFromPick(o){ var m=fMenu(); if(!m||!o) return; var it=itemFrom(o,pick); m.items.push(it); persist();
+  function addFromPick(o){ var m=fMenu(); if(!m||!o) return; var it=itemFrom(o,pick); m.items.push(it); if(pick==='sp'&&!(+L.food.spare>0)){ L.food.spare=1; var sf=document.querySelector('[data-f="spare"]'); if(sf) sf.value=1; } persist();
     var sec=document.querySelector('[data-meal="'+pick+'"] .fd-rows'); if(sec){ sec.insertAdjacentHTML('beforeend',rowHTML(it)); }
     var msg=$('fp-msg'); if(msg){ msg.textContent='Added '+it.name+' ('+fmt(it.g)+' g a day). Pick more, or Done.'; }
     refresh(); }
@@ -2021,7 +2022,10 @@ var FOOD=(function(){
       if(pc<40) out.push(['warn','Only about '+fmt(pc)+'% of the energy comes from carbohydrate. On long climbs carbs are the main fuel: oats, wraps, couscous, mash, dried fruit and sweets help.']);
       if(pf>50) out.push(['warn','About '+fmt(pf)+'% of the energy comes from fat. Light to carry, but appetite drops with altitude and very fatty food can be hard to get down: balance it with carbs.']); }
     if(bw&&mc.hasP){ var pk=mc.ppd/bw; if(pk<1.2) out.push(['warn','Protein is about '+fmt(mc.ppd)+' g a day ('+fmt(pk,1)+' g per kg). Trekking guidance is 1.2–2.0 g per kg: biltong, droëwors, cheese, milk powder, Future Life or a recovery shake help.']); }
-    if(!(+f.spare>0)) out.push(['warn','No spare food. The sign-in at Sentinel Car Park asks whether you carry an extra day\'s food, and storm days on the escarpment are common: one spare day is the usual margin.']);
+    if(!(+f.spare>0)&&mc.spG) out.push(['warn','You\'ve planned a spare day ('+fmt(mc.spG)+' g) but spare days of food is 0, so it isn\'t in your pack weight. <button class="linkbtn" data-fact="spare1">Carry it (set spare days to 1)</button>',true]);
+    else if(!(+f.spare>0)) out.push(['warn','No spare food. The sign-in at Sentinel Car Park asks whether you carry an extra day\'s food, and storm days on the escarpment are common: one spare day is the usual margin.']);
+    var gc=summary(cur()).consOther, hasDr=fMenu().items.some(function(i){return i.meal==='dr'&&num(i.g);});
+    if(gc>0&&hasDr) out.push(['warn','Your gear list also has '+fmt(gc)+' g ticked under Other consumables (drink mixes, coffee). If those are the same drinks as in this menu, untick them in My gear so they aren\'t counted twice.']);
     return out;
   }
   function refresh(){
@@ -2034,9 +2038,9 @@ var FOOD=(function(){
       '<div class="tile'+(short?' fd-short':'')+'"><div class="k">Energy a day</div><div class="v">'+fmt(fd.kcal)+'</div><div class="s">kcal · target '+fmt(t)+(t?' · '+(diff>=0?'+':'−')+fmt(Math.abs(diff)):'')+'</div></div>'+
       '<div class="tile"><div class="k">Food a day</div><div class="v">'+fmt(fd.perDay)+' g</div><div class="s">'+fmt(fd.dens)+' kcal per 100 g</div></div>'+
       '<div class="tile"><div class="k">Protein a day</div><div class="v">'+(mc.hasP?fmt(mc.ppd)+' g':'—')+'</div><div class="s">'+(mc.hasP&&bw?fmt(mc.ppd/bw,1)+' g per kg body weight':mc.hasP?'add body weight for g per kg':'add protein per 100 g')+'</div></div>'+
-      '<div class="tile"><div class="k">Food to carry</div><div class="v">'+fmt(fd.total/1000,2)+' kg</div><div class="s">'+fmt(fd.days,fd.days%1?1:0)+' days ('+N+' + '+fmt(+f.spare||0,(+f.spare||0)%1?1:0)+' spare'+(fd.ownSpare?', '+fmt(fd.spareDay)+' g each':'')+')</div></div>'+
+      '<div class="tile"><div class="k">Food to carry</div><div class="v">'+fmt(fd.total/1000,2)+' kg</div><div class="s">'+fmt(fd.days,fd.days%1?1:0)+' days'+(+f.spare>0?' ('+N+' + '+fmt(+f.spare,(+f.spare)%1?1:0)+' spare'+(fd.ownSpare?', '+fmt(fd.spareDay)+' g each':'')+')':', no spare day counted')+'</div></div>'+
       (function(){ var b=burnEst(); return '<div class="tile"><div class="k">Body weight by the end</div><div class="v">'+(b?(b.kg>0.05?'−'+fmt(b.kg,1)+' kg':'± 0 kg'):'—')+'</div><div class="s">'+(b?'burning about '+fmt(Math.round(b.perDay/50)*50)+' kcal a day':'add your body weight above')+'</div></div>'; })();
-    $('fd-checks').innerHTML=checks(fd,mc).map(function(c){ return '<p class="'+(c[0]==='ok'?'okbox':'warnbox')+'">'+esc(c[1])+'</p>'; }).join('');
+    $('fd-checks').innerHTML=checks(fd,mc).map(function(c){ return '<p class="'+(c[0]==='ok'?'okbox':'warnbox')+'">'+(c[2]?c[1]:esc(c[1]))+'</p>'; }).join('');
     var mx=Math.max.apply(null,MEALS.map(function(ml){return mc.meals[ml[0]].k;}).concat([1]));
     var macro='';
     if(mac){ var pc=mc.cpd*4/mc.kMac*100, pf=mc.fpd*9/mc.kMac*100, pp=Math.max(0,100-pc-pf), cover=mc.kMac/mc.kpd*100;
@@ -2115,6 +2119,7 @@ var FOOD=(function(){
     if(a==='nfcancel'){ creating=false; var el2=document.querySelector('.fd-pick'); if(el2) el2.outerHTML=pickerHTML(pick); return; }
     if(a==='usesg'){ var sg=suggestKcal(); if(sg){ L.food.kcal=sg; L.food.kcalSet=true; persist(); document.querySelectorAll('[data-f="kcal"]').forEach(function(x){ x.value=sg; }); updateFood(); } return; }
     if(a==='cgclose'){ var g=$('fd-cgate'); if(g) g.remove(); return; }
+    if(a==='spare1'){ L.food.spare=1; persist(); rerender(); return; }
     if(a==='nfsave'){ saveNew(); return; }
     if(a==='nfmode'){ var bx=b.closest('.fp-new'); if(bx){ bx.dataset.mode=b.dataset.m; bx.querySelectorAll('[data-fact="nfmode"]').forEach(function(x){ x.setAttribute('aria-pressed',String(x===b)); }); } return; }
     if(a==='mdel'){ if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='Remove?'; b.classList.add('armed'); return; } delMine(b.dataset.id); return; }
@@ -2319,22 +2324,40 @@ function bind(){
     if(a==='save-trip'){ save(); return; }
   });
 }
+/* rows for the person's tab in the group sheet. Every number is the one the planner counts:
+   unweighed lines carry their typical weight (marked), and group gear is what this person carries, not the whole group list */
+var EST_MARK=' [typical weight, not weighed yet]';
 function gearRows(){ var rowsT=[['Setup','Category','Counts as','Item','Your item','Taking','Qty','Grams each','Total grams']];
-  ['A','B'].forEach(function(k){ var lo4=L.lo[k]; items(lo4,'p').concat(items(lo4,'g')).forEach(function(it){ var st=stOf(lo4,it.id), ci=catInfo(lo4,it.scope,it.cat), u=unitOf(it,st), q=qtyOf(it,st), on=isOn(it,st);
-    rowsT.push([L.names[k],(it.scope==='g'?'Group: ':'')+it.cat,KIND[ci.kind]||'',it.name,(st.mine||'').trim(),on?'yes':'no',q,u,on?u*q:0]); }); });
+  ['A','B'].forEach(function(k){ var lo4=L.lo[k], sm=summary(lo4);
+    items(lo4,'p').forEach(function(it){ var st=stOf(lo4,it.id), ci=catInfo(lo4,it.scope,it.cat), u=unitEst(it,st), q=qtyOf(it,st), on=isOn(it,st);
+      rowsT.push([L.names[k],it.cat,KIND[ci.kind]||'',it.name,(st.mine||'').trim()+(isEst(it,st)?EST_MARK:''),on?'yes':'no',q,u,on?u*q:0]); });
+    var ml=typeof GG!=='undefined'&&GG.mineList?GG.mineList():null;
+    if(!sm.ownLoad&&ml&&ml.length) ml.forEach(function(x){ rowsT.push([L.names[k],'Group: you carry',x.fuel?'Consumable':'Carried gear',x.name,'','yes',x.n,x.g,x.g*x.n]); });
+    else { var lbl=sm.ownLoad?'Your group load (typed on Group gear)':'Your share of the group list (even split)';
+      rowsT.push([L.names[k],'Group: you carry','Carried gear',lbl+', gear','','yes',1,Math.round(sm.shareBase),Math.round(sm.shareBase)]);
+      if(sm.shareFuel) rowsT.push([L.names[k],'Group: you carry','Consumable',lbl+', gas','','yes',1,Math.round(sm.shareFuel),Math.round(sm.shareFuel)]); }
+  });
   return rowsT; }
 window.DGT_gearRows=gearRows;
 /* rows for the person's tab in the group sheet: the gear list, then the active food menu (Setup "Food", so the gear totals ignore it) */
-function sheetRows(){ var r=gearRows(), m=fMenu(), fd=food(); if(!m||!m.items.length||!fd.menu) return r;
+function sheetRows(){ var r=gearRows(), m=fMenu(), fd=food(); if(!m||!m.items.length||!fd.menu) return totalsRows(r);
   var sp0=+L.food.spare||0, sc=N?(N+(fd.ownSpare?0:sp0))/N:1;
   r.push(['','','','','','','','','']);
   r.push(['Food','Meal','Counts as','Food','Menu','kcal a day','Days','g a day','Total to carry (g)']);
   m.items.forEach(function(i){ var g=num(i.g)||0, k=num(i.k), d=fDays(i); if(i.meal==='sp'){ r.push(['Food','Spare day','Consumable',i.name,m.name||'Menu','',sp0,g,Math.round(g*sp0)]); return; } r.push(['Food',MEAL_NAME[i.meal]||i.meal,'Consumable',i.name,m.name||'Menu',k==null?'':Math.round(g*k/100*d/N),d,g,Math.round(g*d*sc)]); });
   r.push(['Food','Whole menu','Consumable','Daily average',m.name||'Menu',fd.kcal,fd.days,fd.perDay,fd.total]);
+  return totalsRows(r); }
+/* the same totals the planner shows, for the setup in use */
+function totalsRows(r){ var s=summary(cur()), k=function(g){ return Math.round(g)/1000; }, nm=L.names[L.active];
+  r.push(['','','','','','','','','']);
+  r.push(['Totals','As in the planner, setup '+nm,'','','','','','','kg']);
+  [['Base weight (your gear + group gear you carry)',s.base],['Worn',s.worn],['Food (incl. spare days)',s.food],['Water carried',s.water],['Gas and other consumables',s.fuel+s.consOther],['Pack at the start',s.pack],['Skin-out (pack + worn)',s.skin]]
+    .forEach(function(x){ r.push(['Totals',x[0],'','','','','','',k(x[1])]); });
+  if(estList(s).length) r.push(['Totals','Estimate: '+estList(s).join('; ').replace(/&amp;/g,'&'),'','','','','','','']);
   return r; }
 window.DGT_sheetRows=sheetRows;
 function importSheet(text){
-  var rows=String(text).replace(/\r/g,'').split('\n').map(function(l){return l.split('\t');}).filter(function(r){return r.length>=9;});
+  var rows=String(text).replace(/\r/g,'').split('\n').map(function(l){return l.split('\t');}).filter(function(r){return r.length>=9&&!/^(food|totals)$/i.test(r[0].trim())&&!/^group: you carry$/i.test(r[1].trim());});
   var h=rows[0]&&rows[0][0].trim().toLowerCase()==='setup'?rows.shift():null; if(!rows.length) return 0;
   var KR={'carried gear':'base','worn':'worn','consumable':'cons'}, setups={}, used=[], n=0;
   rows.forEach(function(r){ var sn=r[0].trim(); if(!sn||setups[sn]) return; var k=L.names.A===sn&&used.indexOf('A')<0?'A':L.names.B===sn&&used.indexOf('B')<0?'B':used.indexOf('A')<0?'A':used.indexOf('B')<0?'B':null; if(k){ setups[sn]=k; used.push(k); } });
@@ -2342,6 +2365,7 @@ function importSheet(text){
   rows.forEach(function(r){ var k=setups[r[0].trim()]; if(!k) return; var lo=L.lo[k], cat=r[1].trim(), scope='p';
     if(/^group:\s*/i.test(cat)){ scope='g'; cat=cat.replace(/^group:\s*/i,''); }
     var name=r[3].trim(), mine=r[4].trim(), on=/^y/i.test(r[5].trim()), qty=num(r[6]), g=num(r[7]); if(!name) return;
+    if(mine.indexOf(EST_MARK.trim())>=0){ mine=mine.replace(EST_MARK.trim(),'').trim(); g=null; }
     var it=S.catalog.filter(function(c){return c.scope===scope&&c.name===name;})[0]||lo.custom.filter(function(c){return c.scope===scope&&c.name===name;})[0];
     if(!it){ if(!catList(lo,scope).some(function(c){return c.name===cat;})) lo.cats.push({scope:scope,name:cat,kind:KR[r[2].trim().toLowerCase()]||'base'});
       lo.custom.push({id:'u'+Date.now().toString(36)+n,scope:scope,cat:cat,name:name,g:g||0,essential:false,custom:true}); it=lo.custom[lo.custom.length-1]; }
@@ -3073,7 +3097,7 @@ var GG=(function(){
   function unitG(i){ var c=S.catalog.filter(function(x){return x.id===i.id&&x.scope==='g';})[0]; if(c){ var u=unitOf(c,stOf(cur(),c.id)); return u||c.g||c.typ||0; } return i.g||0; }
   function mineList(){ var L2=list(), by={}; L2.forEach(function(i){ by[i.id]=i; });
     return mineIds().map(function(c){ var i=by[c.item]||{id:c.item,name:c.item,g:0}, cat=S.catalog.filter(function(x){return x.id===i.id&&x.scope==='g';})[0];
-      var fuel=cat?catInfo(cur(),'g',cat.cat).kind==='cons':/\b(gas|fuel|canister)\b/i.test(i.name);
+      var fuel=cat?(!!cat.fuel||catInfo(cur(),'g',cat.cat).kind==='cons'):/\b(gas|fuel|canister)\b/i.test(i.name);
       return {id:i.id,name:i.name,n:c.n,g:unitG(i),fuel:fuel,cat:!!cat}; }); }
   function mySplit(){ return mineList().reduce(function(a,x){ if(x.fuel) a.fuel+=x.g*x.n; else a.base+=x.g*x.n; return a; },{base:0,fuel:0}); }
   function myLoad(){ return mineList().reduce(function(a,x){ return a+x.g*x.n; },0); }
@@ -3639,6 +3663,16 @@ PEOPLE.start(); FOOD.start();
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
   if('serviceWorker' in navigator&&location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(function(){});
+})();
+
+/* tell people when a newer version is live, so nobody plans on an old copy */
+(function(){ var me=(document.querySelector('meta[name="dgt-build"]')||{}).content, last=0; if(!me) return;
+  function show(){ if(document.getElementById('dgt-upd')) return; var d=document.createElement('div'); d.id='dgt-upd'; d.className='dgt-bar'; d.setAttribute('role','status');
+    d.innerHTML='<span>A newer version of the planner is ready. Your data is saved.</span><button class="btn primary" type="button">Reload</button>'; d.querySelector('button').addEventListener('click',function(){ location.reload(); });
+    document.body.insertBefore(d,document.getElementById('app')); }
+  function check(){ if(Date.now()-last<120000) return; last=Date.now();
+    fetch('index.html?b='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){ var m=t.match(/name="dgt-build" content="([^"]+)"/); if(m&&m[1]!==me) show(); }).catch(function(){}); }
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) check(); }); window.addEventListener('focus',check); setInterval(check,600000); setTimeout(check,8000);
 })();
 </script>
 </body></html>

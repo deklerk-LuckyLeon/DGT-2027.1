@@ -114,8 +114,8 @@ function writeGearTab_(who, rows) {
   if (!sh) {
     sh = ss.insertSheet(name);
     sh.getRange(1, 1).setValue(name + "'s gear list").setFontWeight('bold').setFontSize(14);
-    sh.getRange(4, 11, 1, 4).setValues([['Setup', 'Base weight (kg)', 'Worn (kg)', 'Consumables (kg)']]).setFontWeight('bold');
-    sh.getRange(5, 11).setFormula('=IFERROR(UNIQUE(FILTER($A$5:$A,$A$5:$A<>"")),"")');
+    sh.getRange(4, 11, 1, 4).setValues([['Setup', 'Own gear (kg)', 'Worn (kg)', 'Own consumables (kg)']]).setFontWeight('bold');
+    sh.getRange(5, 11).setFormula('=IFERROR(UNIQUE(FILTER($A$5:$A,$A$5:$A<>"",$A$5:$A<>"Food",$A$5:$A<>"Totals")),"")');
     [5, 6].forEach(function (r) {
       ['Carried gear', 'Worn', 'Consumable'].forEach(function (kind, j) {
         sh.getRange(r, 12 + j).setFormula('=IF($K' + r + '="","",SUMIFS($I$5:$I,$A$5:$A,$K' + r + ',$C$5:$C,"' + kind + '",$B$5:$B,"<>Group:*")/1000)');

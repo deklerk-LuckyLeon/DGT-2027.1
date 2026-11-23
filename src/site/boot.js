@@ -117,3 +117,13 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
   if('serviceWorker' in navigator&&location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(function(){});
 })();
+
+/* tell people when a newer version is live, so nobody plans on an old copy */
+(function(){ var me=(document.querySelector('meta[name="dgt-build"]')||{}).content, last=0; if(!me) return;
+  function show(){ if(document.getElementById('dgt-upd')) return; var d=document.createElement('div'); d.id='dgt-upd'; d.className='dgt-bar'; d.setAttribute('role','status');
+    d.innerHTML='<span>A newer version of the planner is ready. Your data is saved.</span><button class="btn primary" type="button">Reload</button>'; d.querySelector('button').addEventListener('click',function(){ location.reload(); });
+    document.body.insertBefore(d,document.getElementById('app')); }
+  function check(){ if(Date.now()-last<120000) return; last=Date.now();
+    fetch('index.html?b='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){ var m=t.match(/name="dgt-build" content="([^"]+)"/); if(m&&m[1]!==me) show(); }).catch(function(){}); }
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) check(); }); window.addEventListener('focus',check); setInterval(check,600000); setTimeout(check,8000);
+})();
