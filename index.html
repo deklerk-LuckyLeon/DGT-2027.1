@@ -944,6 +944,13 @@ body{font-size:16px}
 .mbase legend{font-size:13px;font-weight:600;padding:0;margin-bottom:4px}
 .mbase label{display:flex;gap:8px;align-items:center;font-size:14px;padding:3px 0}
 .mattrib a{color:inherit}
+.fp-new[data-mode="pack"] .m-100,.fp-new[data-mode="100"] .m-pack{display:none}
+.fp-mode{margin:6px 0 10px}
+.fp-itw{position:relative;display:flex}
+.fp-itw .fp-it{flex:1;min-width:0;padding-right:38px}
+.fp-del{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--ink-muted);font:inherit;font-size:18px;line-height:1;padding:6px 8px;border-radius:var(--r-sm);cursor:pointer}
+.fp-del:hover,.fp-del.armed{color:var(--danger)}
+.fp-del.armed{font-size:13px}
 
 /* ---- website: sign-in gate ---- */
 .gate{position:fixed;inset:0;z-index:200;background:var(--surface);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:max(24px,env(safe-area-inset-top)) 16px 24px}
@@ -1800,7 +1807,7 @@ var FOOD=(function(){
   function rowHTML(it){
     return '<div class="fd-row" data-fid="'+it.id+'">'+
       '<input class="fd-name" data-fd="name" value="'+esc(it.name)+'" aria-label="Food">'+
-      '<label class="fd-in"><span>g a day</span><input data-fd="g" inputmode="decimal" value="'+(it.g==null?'':esc(it.g))+'"'+(it.g==null?' class="need"':'')+'></label>'+
+      '<label class="fd-in"><span>dry g a day</span><input data-fd="g" inputmode="decimal" value="'+(it.g==null?'':esc(it.g))+'"'+(it.g==null?' class="need"':'')+'></label>'+
       '<label class="fd-in"><span>kcal/100 g</span><input data-fd="k" inputmode="decimal" value="'+(it.k==null?'':esc(it.k))+'"'+(it.k==null?' class="need"':'')+'></label>'+
       '<label class="fd-in"><span>protein/100 g</span><input data-fd="p" inputmode="decimal" value="'+(it.p==null?'':esc(it.p))+'"></label>'+
       '<label class="fd-in"><span>days</span><input data-fd="days" inputmode="numeric" placeholder="all" value="'+(it.days==null?'':esc(it.days))+'"></label>'+
@@ -1826,7 +1833,8 @@ var FOOD=(function(){
     var gs=pickItems(meal);
     if(!gs.length) return '<p class="note">Nothing matches “'+esc(pickQ)+'”. Create it as your own food below.</p>';
     return gs.map(function(g){ return '<div class="fp-g"><h5>'+esc(g[0])+'</h5><div class="fp-items">'+g[1].map(function(o){
-      return '<button class="fp-it" data-fpick="'+esc(o.key)+'"><b>'+esc(o.name)+'</b><span class="mono">'+fmt(o.k)+' kcal/100 g · '+fmt(o.g)+' g</span></button>'; }).join('')+'</div></div>'; }).join('');
+      var own=o.src==='mine', b='<button class="fp-it" data-fpick="'+esc(o.key)+'"><b>'+esc(o.name)+'</b><span class="mono">'+fmt(o.k)+' kcal/100 g, '+fmt(o.g)+' g</span></button>';
+      return own?'<div class="fp-itw">'+b+'<button class="fp-del" data-fact="mdel" data-id="'+esc(o.id)+'" aria-label="Remove '+esc(o.name)+' from your foods">×</button></div>':b; }).join('')+'</div></div>'; }).join('');
   }
   function catOptions(sel){ return FCATS.map(function(c){ return '<option value="'+c[0]+'"'+(c[0]===sel?' selected':'')+'>'+esc(c[1])+'</option>'; }).join(''); }
   function pickerHTML(meal){
@@ -1840,18 +1848,27 @@ var FOOD=(function(){
       (creating?newFoodHTML(meal):'<button class="btn" data-fact="newfood">+ Create your own food</button>')+
       '</div>';
   }
+  /* your own food: copy the label either per 100 g or per pack; always the dry food as it comes out of the pack */
   function newFoodHTML(meal){
     var def=catsFor(meal)[0];
-    return '<div class="fp-new"><h5>Your own food</h5><p class="note">Copy the numbers from the label: per 100 g, as sold (dry).</p><div class="fp-grid">'+
+    return '<div class="fp-new" data-mode="pack"><h5>Your own food</h5>'+
+      '<p class="note">Use the food as it comes out of the pack: the dry weight, before you add water. The water you add isn\'t in your pack weight; you fill up along the way.</p>'+
+      '<div class="seg fp-mode" role="group" aria-label="The label gives values"><button data-fact="nfmode" data-m="pack" aria-pressed="true">Per pack or serving</button><button data-fact="nfmode" data-m="100" aria-pressed="false">Per 100 g</button></div>'+
+      '<div class="fp-grid">'+
       '<label class="field fp-wide">Name<input data-nf="name" value="'+esc(pickQ)+'"></label>'+
       '<label class="field fp-wide">Type of food<select data-nf="cat">'+catOptions(def)+'</select></label>'+
-      '<label class="field">kcal per 100 g<input data-nf="k" inputmode="decimal" placeholder="e.g. 450"></label>'+
-      '<label class="field">Protein g/100 g<input data-nf="p" inputmode="decimal"></label>'+
-      '<label class="field">Carbs g/100 g<input data-nf="c" inputmode="decimal"></label>'+
-      '<label class="field">Fat g/100 g<input data-nf="f" inputmode="decimal"></label>'+
-      '<label class="field">Grams a day<input data-nf="g" inputmode="decimal"></label>'+
-      '<label class="field">Hot water, ml<input data-nf="w" inputmode="decimal" placeholder="0"></label></div>'+
-      '<p class="note">kJ on the label? Divide by 4.18 for kcal. Hot water is for one day\'s portion; leave it empty for food you don\'t cook.</p>'+
+      '<label class="field m-pack">Pack weight, dry (g)<input data-nf="pw" inputmode="decimal" placeholder="net weight on the pack"></label>'+
+      '<label class="field m-pack">kcal per pack<input data-nf="kp" inputmode="decimal"></label>'+
+      '<label class="field m-pack">Protein g per pack<input data-nf="pp" inputmode="decimal"></label>'+
+      '<label class="field m-pack">Carbs g per pack<input data-nf="cp" inputmode="decimal"></label>'+
+      '<label class="field m-pack">Fat g per pack<input data-nf="fp" inputmode="decimal"></label>'+
+      '<label class="field m-100">kcal per 100 g<input data-nf="k" inputmode="decimal" placeholder="e.g. 450"></label>'+
+      '<label class="field m-100">Protein g/100 g<input data-nf="p" inputmode="decimal"></label>'+
+      '<label class="field m-100">Carbs g/100 g<input data-nf="c" inputmode="decimal"></label>'+
+      '<label class="field m-100">Fat g/100 g<input data-nf="f" inputmode="decimal"></label>'+
+      '<label class="field">Grams a day<input data-nf="g" inputmode="decimal" placeholder="one pack"></label>'+
+      '<label class="field">Water you add, ml<input data-nf="w" inputmode="decimal" placeholder="0"></label></div>'+
+      '<p class="note">Water you add is only for planning gas; it never counts as weight. If the label only gives values "as prepared", use the per-pack numbers: the energy in a pack doesn\'t change when you add water. kJ on the label? Divide by 4.18 for kcal.</p>'+
       (dbState==='ok'?'<label class="adv-chk"><input type="checkbox" data-nf="share" checked> Share this food with the group, so others can pick it too</label>':'')+
       '<div class="toolbar"><button class="btn primary" data-fact="nfsave">Save and add</button><button class="btn ghost" data-fact="nfcancel">Cancel</button></div></div>';
   }
@@ -1868,15 +1885,28 @@ var FOOD=(function(){
     refresh(); }
   function saveNew(){
     var box=document.querySelector('.fp-new'); if(!box) return; function v(k){ var e=box.querySelector('[data-nf="'+k+'"]'); return e?e.value:''; }
-    var name=v('name').trim(), k=num(v('k')), g=num(v('g'));
-    if(!name){ box.querySelector('[data-nf="name"]').focus(); return; }
-    if(k==null){ box.querySelector('[data-nf="k"]').focus(); $('fp-msg').textContent='Add the kcal per 100 g from the label.'; return; }
-    var gg=g||50, w=num(v('w')), o={id:fid(),cat:v('cat'),name:name.slice(0,80),k:k,p:num(v('p')),c:num(v('c')),f:num(v('f')),g:gg,w:w?Math.round(w/gg*100):0};
+    function focus(k,msg){ var e=box.querySelector('[data-nf="'+k+'"]'); if(e) e.focus(); $('fp-msg').textContent=msg; }
+    var name=v('name').trim(), mode=box.dataset.mode, g=num(v('g')), k,p,c,f,gg;
+    if(!name){ focus('name','Give the food a name.'); return; }
+    if(mode==='pack'){ var pw=num(v('pw')), kp=num(v('kp'));
+      if(!pw){ focus('pw','Add the dry weight of the pack (the net weight printed on it).'); return; }
+      if(kp==null){ focus('kp','Add the kcal for the whole pack.'); return; }
+      var per=function(x){ x=num(x); return x==null?null:Math.round(x/pw*1000)/10; };
+      k=Math.round(kp/pw*1000)/10; p=per(v('pp')); c=per(v('cp')); f=per(v('fp')); gg=g||pw; }
+    else { k=num(v('k')); p=num(v('p')); c=num(v('c')); f=num(v('f')); gg=g||50;
+      if(k==null){ focus('k','Add the kcal per 100 g from the label.'); return; } }
+    if((k<150||k>900)&&box.dataset.ok!==String(k)){ box.dataset.ok=String(k);
+      $('fp-msg').textContent=k<150?'That works out at '+fmt(k)+' kcal per 100 g, which is what food weighs once water is in it. Dry trail food is usually 350 to 600. Check you used the dry weight, or press Save again if it really is that low (fresh fruit, say).':'That works out at '+fmt(k)+' kcal per 100 g, more than pure oil. Check the numbers, or press Save again.'; return; }
+    var w=num(v('w')), o={id:fid(),cat:v('cat'),name:name.slice(0,80),k:k,p:p,c:c,f:f,g:gg,w:w?Math.round(w/gg*100):0};
     fMine().push(o); var sh=box.querySelector('[data-nf="share"]');
     if(sh&&sh.checked&&dbCol){ var doc={cat:o.cat,name:o.name,k:o.k,p:o.p,c:o.c,f:o.f,g:o.g,w:o.w,at:new Date().toISOString()};
       Object.keys(doc).forEach(function(x){ if(doc[x]==null) delete doc[x]; }); dbCol.doc(o.id).set(doc).catch(function(){}); }
     creating=false; addFromPick(Object.assign({src:'mine'},o)); pickQ=''; var el=document.querySelector('.fd-pick'); if(el) el.outerHTML=pickerHTML(pick);
-    var msg=$('fp-msg'); if(msg) msg.textContent='Saved '+o.name+' to your foods and added it.'; }
+    var msg=$('fp-msg'); if(msg) msg.textContent='Saved '+o.name+' ('+fmt(o.k)+' kcal per 100 g) and added it.'; }
+  /* remove one of your own foods (and its shared copy). Menus that already use it keep their row */
+  function delMine(id){ var ms=fMine(), i=ms.findIndex(function(o){return o.id===id;}); if(i<0) return; var nm=ms[i].name; ms.splice(i,1);
+    if(dbCol) try{ dbCol.doc(id).delete().catch(function(){}); }catch(e){}
+    persist(); redrawPick(); var msg=$('fp-msg'); if(msg) msg.textContent='Removed '+nm+' from your foods. Any menu row using it stays; fix or remove it there.'; }
 
   function view(){
     var f=L.food, m=fMenu(), ms=fMenus(), g=gasPlan();
@@ -1934,6 +1964,10 @@ var FOOD=(function(){
     var f=L.food, t=+f.kcal||0, out=[], gap=t-fd.kcal, bw=num(f.bw);
     if(mc.noK.length) out.push(['warn','No calories yet for '+mc.noK.join(', ')+'. The totals are low until you add kcal per 100 g from the pack.']);
     if(mc.noG.length) out.push(['warn','No grams yet for '+mc.noG.join(', ')+'.']);
+    var wet=fMenu().items.filter(function(i){ var k=num(i.k); return k!=null&&k>0&&k<150&&num(i.g)&&!/fruit|apple|banana|orange/i.test(i.name); });
+    if(wet.length) out.push(['warn',wet.map(function(i){return i.name+' ('+fmt(num(i.k))+' kcal per 100 g)';}).join(', ')+(wet.length>1?' look':' looks')+' like the weight with water added. Dry trail food is usually 350 to 600 kcal per 100 g: put in the dry weight and the kcal for that weight (the per-pack numbers on the label), so your pack weight and calories are right.']);
+    var dup={}; fMenu().items.forEach(function(i){ var b=String(i.name).toLowerCase().replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim(); dup[b]=(dup[b]||0)+1; });
+    var dd=Object.keys(dup).filter(function(b){return dup[b]>1;}); if(dd.length) out.push(['warn','The menu has '+dd.join(', ')+' more than once. If that\'s by accident, remove the extra row: each row adds its grams to your pack.']);
     if(gap>50) out.push(['warn','Short by about '+fmt(gap)+' kcal a day against your '+fmt(t)+' kcal target. Closing it takes about '+fmt(gap/8.84)+' g of olive oil, '+fmt(gap/6.2)+' g of salted nuts or '+fmt(gap/5.8)+' g of dark chocolate a day (or a mix).']);
     else if(t&&fd.kcal>t*1.15) out.push(['ok','About '+fmt(fd.kcal-t)+' kcal a day over your target. Fine if you tend to be hungry on the hill; otherwise that\'s about '+fmt((fd.kcal-t)/fd.dens*100*fd.days)+' g you could leave out.']);
     else if(t) out.push(['ok','On target: '+fmt(fd.kcal)+' kcal a day against '+fmt(t)+'.']);
@@ -2040,6 +2074,8 @@ var FOOD=(function(){
     if(a==='newfood'){ creating=true; var el=document.querySelector('.fd-pick'); if(el){ el.outerHTML=pickerHTML(pick); var n=document.querySelector('.fp-new [data-nf="'+(pickQ?'k':'name')+'"]'); if(n) n.focus(); } return; }
     if(a==='nfcancel'){ creating=false; var el2=document.querySelector('.fd-pick'); if(el2) el2.outerHTML=pickerHTML(pick); return; }
     if(a==='nfsave'){ saveNew(); return; }
+    if(a==='nfmode'){ var bx=b.closest('.fp-new'); if(bx){ bx.dataset.mode=b.dataset.m; bx.querySelectorAll('[data-fact="nfmode"]').forEach(function(x){ x.setAttribute('aria-pressed',String(x===b)); }); } return; }
+    if(a==='mdel'){ if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='Remove?'; b.classList.add('armed'); return; } delMine(b.dataset.id); return; }
     if(a==='shop'){ copy(shopText(),'Copied the shopping list.'); return; }
     if(a==='tsv'){ copy(tsv(),'Copied '+m.items.length+' rows. Paste into a sheet at cell A1.'); return; }
     if(a==='ai'){ ai(b); return; }
