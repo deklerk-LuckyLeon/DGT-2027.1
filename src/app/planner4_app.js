@@ -729,7 +729,8 @@ var FOODLIB=[
   ['hot','Ground coffee / drip bags',20,0,0,0,15,200],['hot','Instant coffee',100,8,10,0,6,200],['hot','Cappuccino / 3-in-1 sachet',440,5,70,15,20,150],['hot','Tea / rooibos',0,0,0,0,4,250],
   ['hot','Hot chocolate mix',400,6,75,8,25,250],['hot','Milo',410,9,70,9,25,250],['hot','Instant soup (Cup-a-Soup)',380,6,65,9,20,250],
   ['spo','Electrolyte drink powder',260,0,65,0,15,0],['spo','Energy drink powder (Energade / Game)',380,0,95,0,40,0],['spo','Energy gel',270,0,68,0,40,0],['spo','Energy chews',330,0,80,0,50,0],
-  ['spo','Glucose sweets',380,0,95,0,30,0],['spo','Recovery shake powder',380,25,55,6,40,0]
+  ['spo','Glucose sweets',380,0,95,0,30,0],['spo','Recovery shake powder',380,25,55,6,40,0],
+  ['spo','Meal shake powder (yfood)',452,29,35,20,88,0],['spo','Maltodextrin',380,0,95,0,40,0]
 ];
 function libObj(l,i){ return {src:'lib',key:'l'+i,cat:l[0],name:l[1],k:l[2],p:l[3],c:l[4],f:l[5],g:l[6],w:l[6]?Math.round(l[7]/l[6]*100):0}; }
 var FLIB=FOODLIB.map(libObj);
@@ -1013,9 +1014,9 @@ var FOOD=(function(){
     var f=L.food, t=+f.kcal||0, out=[], gap=t-fd.kcal, bw=num(f.bw);
     if(mc.noK.length) out.push(['warn','No calories yet for '+mc.noK.join(', ')+'. The totals are low until you add kcal per 100 g from the pack.']);
     if(mc.noG.length) out.push(['warn','No grams yet for '+mc.noG.join(', ')+'.']);
-    var wet=fMenu().items.filter(function(i){ var k=num(i.k); return k!=null&&k>0&&k<150&&num(i.g)&&!/fruit|apple|banana|orange/i.test(i.name); });
+    var wet=fMenu().items.filter(function(i){ var k=num(i.k); return k!=null&&k>0&&k<150&&num(i.g)&&!/fruit|apple|banana|orange|coffee|tea|rooibos|espresso/i.test(i.name); });
     if(wet.length) out.push(['warn',wet.map(function(i){return i.name+' ('+fmt(num(i.k))+' kcal per 100 g)';}).join(', ')+(wet.length>1?' look':' looks')+' like the weight with water added. Dry trail food is usually 350 to 600 kcal per 100 g: put in the dry weight and the kcal for that weight (the per-pack numbers on the label), so your pack weight and calories are right.']);
-    var dup={}; fMenu().items.forEach(function(i){ var b=String(i.name).toLowerCase().replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim(); dup[b]=(dup[b]||0)+1; });
+    var dup={}; fMenu().items.forEach(function(i){ if(i.meal==='sp') return; var b=String(i.name).toLowerCase().replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim(); dup[b]=(dup[b]||0)+1; });
     var dd=Object.keys(dup).filter(function(b){return dup[b]>1;}); if(dd.length) out.push(['warn','The menu has '+dd.join(', ')+' more than once. If that\'s by accident, remove the extra row: each row adds its grams to your pack.']);
     if(gap>50) out.push(['warn','Short by about '+fmt(gap)+' kcal a day against your '+fmt(t)+' kcal target. Closing it takes about '+fmt(gap/8.84)+' g of olive oil, '+fmt(gap/6.2)+' g of salted nuts or '+fmt(gap/5.8)+' g of dark chocolate a day (or a mix).']);
     else if(t&&fd.kcal>t*1.15) out.push(['ok','About '+fmt(fd.kcal-t)+' kcal a day over your target. Fine if you tend to be hungry on the hill; otherwise that\'s about '+fmt((fd.kcal-t)/fd.dens*100*fd.days)+' g you could leave out.']);
