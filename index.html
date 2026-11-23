@@ -1213,42 +1213,11 @@ function summary(lo){
   for(var i=0;i<CLASSES.length;i++) if(r.base<CLASSES[i][0]){ r.cls=CLASSES[i][1]; r.clsI=i; break; }
   return r;
 }
-function waterHTML(wp){
-  var m=wp.most, d=m?m.d:null;
-  return '<div class="sum-row"><span>A typical day</span><b>'+fmt(wp.avg,1)+' L</b></div>'+
-    '<div class="sum-row sub"><span>of which hot water for your menu</span><b>'+fmt(wp.cook,1)+' L</b></div>'+
-    (d?'<div class="sum-row"><span>Most you\'ll carry at once</span><b>'+fmt(m.peak,1)+' L</b></div><p class="note">Day '+d.day+': about '+fmt(d.worst.h,1)+' hours without water between km '+fmt(d.worst.a,1)+' and '+fmt(d.worst.b,1)+(d.worst.camp?', carrying your camp and cooking water for that night':'')+'. Bottles for at least '+fmt(Math.ceil(m.peak),0)+' L.</p>':'')+
-    (Math.abs((+L.food.water||0)-wp.start)>=0.25?'<p class="note">From Sentinel car park you need about '+fmt(wp.start,1)+' L to the first water'+(wp.firstKm!=null?' at km '+fmt(wp.firstKm,1):'')+'. <button class="linkbtn" data-wstart="'+wp.start+'">Use '+fmt(wp.start,1)+' L as water at the start</button></p>':'')+
-    '<details class="fd-wdays"><summary>Day by day</summary><div class="tbl-wrap"><table class="t"><thead><tr><th>Day</th><th class="r">Walking</th><th class="r">Drink and cook</th><th>Longest without water</th><th class="r">Carry</th></tr></thead><tbody>'+
-    wp.days.map(function(x){ return '<tr><td>'+x.day+'</td><td class="r">'+fmt(x.hrs,1)+' h</td><td class="r">'+fmt(x.drink+x.cook,1)+' L</td><td>km '+fmt(x.worst.a,1)+'–'+fmt(x.worst.b,1)+', '+fmt(x.worst.h,1)+' h'+(x.worst.camp?', with camp water':'')+'</td><td class="r">'+fmt(x.carry,1)+' L</td></tr>'; }).join('')+
-    '</tbody></table></div><p class="note">Walking time is km ÷ 3.5 plus metres up ÷ 500, so treat it as a guide. Carry includes a 0.25 L reserve. Water sources are the GPX water points and the likely streams on the map'+(L.food.smallW?'':' (bigger ones only)')+'; check them on the Slingsby map. Camps with no known water within 1.5 km mean carrying that night\'s water from the last source; many caves have a spring close by that isn\'t mapped, so this is the cautious version.</p></details>';
-}
-/* Water: what you drink and boil each day, and how much to carry between sources.
-   Walking time per stretch: km / 3.5 + metres up / 500 (rough ground). Sources: GPX water points plus the likely
-   streams worked out from the terrain (only the bigger ones unless "count small streams" is on). */
-function waterSources(){ var f=L.food, small=!!f.smallW, out=[];
-  D.pois.forEach(function(p){ if(p.c==='water') out.push({km:p.km,n:p.n,k:'gpx'}); });
-  (D.streams||[]).forEach(function(w){ if(small||w.a>=1) out.push({km:w.km,n:'Likely stream',k:'stream',a:w.a}); });
-  return out.sort(function(a,b){return a.km-b.km;}); }
-function climbBetween(a,b){ var K=D.route.km, E=D.route.e, up=0, prev=null; for(var i=0;i<K.length;i++){ if(K[i]<a) continue; if(K[i]>b) break; if(prev!=null&&E[i]>prev) up+=E[i]-prev; prev=E[i]; } return up; }
-function hoursFor(a,b){ return (b-a)/3.5+climbBetween(a,b)/500; }
-function waterPlan(){
-  var f=L.food, rate=num(f.drink)!=null?+f.drink:0.4, camp=num(f.campL)!=null?+f.campL:0.75, mc=menuCalc(fMenu());
-  var cook=mc&&mc.wml?mc.wml/1000:(+P.litres_per_person_per_day||0), src=waterSources(), days=[], most=null;
-  var r2=function(x){ return Math.ceil(x*2)/2; };
-  PLAN.stages.forEach(function(s,ix){
-    var last=ix===PLAN.stages.length-1, inDay=src.filter(function(w){return w.km>s.from+0.2&&w.km<s.to-0.2;}).map(function(w){return w.km;});
-    var atCamp=last||src.some(function(w){return Math.abs(w.km-s.to)<=1.5;});
-    var pts=[s.from].concat(inDay,[s.to]), worst=null;
-    for(var i=1;i<pts.length;i++){ var h=hoursFor(pts[i-1],pts[i]), endCamp=i===pts.length-1&&!atCamp;
-      var c=r2(h*rate+0.25+(endCamp?camp+cook:0)); if(!worst||c>worst.c) worst={a:pts[i-1],b:pts[i],h:h,c:c,camp:endCamp}; }
-    var hrs=hoursFor(s.from,s.to), d={day:s.day,from:s.from,to:s.to,hrs:hrs,drink:hrs*rate+camp,cook:cook,worst:worst,carry:worst.c,dry:!atCamp};
-    days.push(d); if(!most||d.carry>most.peak) most={peak:d.carry,d:d}; });
-  var first=src.filter(function(w){return w.km>0.2;})[0], start=first?r2(hoursFor(0,first.km)*rate+0.25):1;
-  return {rate:rate,camp:camp,cook:cook,days:days,most:most,start:start,firstKm:first?first.km:null,avg:days.reduce(function(a,d){return a+d.drink+d.cook;},0)/Math.max(1,days.length)}; }
+/* water to boil a day per person: filled up near camp, so it is never carried; it only sizes the gas */
+function boilL(){ var v=num(L.food.boil); return v!=null&&v>0?v:1; }
 function gasPlan(){
   var gs=Math.max(1,+L.groupSize||1);
-  var need=P.litres_per_person_per_day*(N-1)*P.group_g_per_litre_measured*gs;
+  var need=boilL()*(N-1)*P.group_g_per_litre_measured*gs;
   var lo=cur(), have=0, n=0;
   items(lo,'g').forEach(function(it){ if(it.fuel){ var s=stOf(lo,it.id); have+=consOf(it,s); n+=isOn(it,s)?qtyOf(it,s):0; } });
   return {need:need,have:have,n:n,netEach:n?have/n:0,margin:have-need};
@@ -1889,7 +1858,7 @@ var FOOD=(function(){
   function newFoodHTML(meal){
     var def=catsFor(meal)[0];
     return '<div class="fp-new" data-mode="pack"><h5>Your own food</h5>'+
-      '<p class="note">Use the food as it comes out of the pack: the dry weight, before you add water. The water you add isn\'t in your pack weight; you fill up along the way.</p>'+
+      '<p class="note">Use the food as it comes out of the pack: the dry weight, before you add water.</p>'+
       '<div class="seg fp-mode" role="group" aria-label="The label gives values"><button data-fact="nfmode" data-m="pack" aria-pressed="true">Per pack or serving</button><button data-fact="nfmode" data-m="100" aria-pressed="false">Per 100 g</button></div>'+
       '<div class="fp-grid">'+
       '<label class="field fp-wide">Name<input data-nf="name" value="'+esc(pickQ)+'"></label>'+
@@ -1904,8 +1873,7 @@ var FOOD=(function(){
       '<label class="field m-100">Carbs g/100 g<input data-nf="c" inputmode="decimal"></label>'+
       '<label class="field m-100">Fat g/100 g<input data-nf="f" inputmode="decimal"></label>'+
       '<label class="field">Grams a day<input data-nf="g" inputmode="decimal" placeholder="one pack"></label>'+
-      '<label class="field">Water you add, ml<input data-nf="w" inputmode="decimal" placeholder="0"></label></div>'+
-      '<p class="note">Water you add is only for planning gas; it never counts as weight. If the label only gives values "as prepared", use the per-pack numbers: the energy in a pack doesn\'t change when you add water. kJ on the label? Divide by 4.18 for kcal.</p>'+
+      '</div><p class="note">If the label only gives values "as prepared", use the per-pack numbers: the energy in a pack doesn\'t change when you add water. kJ on the label? Divide by 4.18 for kcal.</p>'+
       (dbState==='ok'?'<label class="adv-chk"><input type="checkbox" data-nf="share" checked> Share this food with the group, so others can pick it too</label>':'')+
       '<div class="toolbar"><button class="btn primary" data-fact="nfsave">Save and add</button><button class="btn ghost" data-fact="nfcancel">Cancel</button></div></div>';
   }
@@ -1934,7 +1902,7 @@ var FOOD=(function(){
       if(k==null){ focus('k','Add the kcal per 100 g from the label.'); return; } }
     if((k<150||k>900)&&box.dataset.ok!==String(k)){ box.dataset.ok=String(k);
       $('fp-msg').textContent=k<150?'That works out at '+fmt(k)+' kcal per 100 g, which is what food weighs once water is in it. Dry trail food is usually 350 to 600. Check you used the dry weight, or press Save again if it really is that low (fresh fruit, say).':'That works out at '+fmt(k)+' kcal per 100 g, more than pure oil. Check the numbers, or press Save again.'; return; }
-    var w=num(v('w')), o={id:fid(),cat:v('cat'),name:name.slice(0,80),k:k,p:p,c:c,f:f,g:gg,w:w?Math.round(w/gg*100):0};
+    var o={id:fid(),cat:v('cat'),name:name.slice(0,80),k:k,p:p,c:c,f:f,g:gg,w:0};
     fMine().push(o); var sh=box.querySelector('[data-nf="share"]');
     if(sh&&sh.checked&&dbCol){ var doc={cat:o.cat,name:o.name,k:o.k,p:o.p,c:o.c,f:o.f,g:o.g,w:o.w,at:new Date().toISOString()};
       Object.keys(doc).forEach(function(x){ if(doc[x]==null) delete doc[x]; }); dbCol.doc(o.id).set(doc).catch(function(){}); }
@@ -1958,16 +1926,13 @@ var FOOD=(function(){
         '<div class="sum-row"><span>Total food to carry</span><b id="f-total"></b></div>'+
         '<div class="sum-row" style="border:0"><span>Total energy</span><b id="f-kcal"></b></div>'+
         '<p class="note">A quick estimate. Build a menu below to check it food by food.</p></div>')+'</div>';
-    var wp=waterPlan(), wcard='<div class="card fd-water"><h3 style="margin-bottom:6px">Water</h3>'+
-      '<p class="note">Food weights are always dry. The water you drink and boil comes from streams along the way; the only water in your pack weight is what\'s in your bottles.</p>'+
-      '<div class="fields"><label class="field">Water in your pack at the start, litres<input type="number" step="0.5" min="0" max="5" data-f="water" value="'+f.water+'"></label>'+
-      '<label class="field">Drink while walking, litres an hour<input type="number" step="0.1" min="0.2" max="1.2" data-f="drink" value="'+wp.rate+'"></label>'+
-      '<label class="field">Drink in camp (besides cooking), litres<input type="number" step="0.25" min="0" max="3" data-f="campL" value="'+wp.camp+'"></label></div>'+
-      '<label class="adv-chk"><input type="checkbox" data-wsmall'+(f.smallW?' checked':'')+'> Count small streams too (they can be a trickle or dry)</label>'+
-      '<div id="f-water">'+waterHTML(wp)+'</div></div>';
+    var wcard='<div class="card fd-water"><h3 style="margin-bottom:6px">Water</h3>'+
+      '<div class="fields"><label class="field">Water you carry, litres<input type="number" step="0.5" min="0" max="4" data-f="water" value="'+f.water+'"></label>'+
+      '<label class="field">Water you boil a day, litres<input type="number" step="0.25" min="0" max="4" data-f="boil" value="'+boilL()+'"></label></div>'+
+      '<p class="note">Water you carry counts in your pack weight. Water for cooking and hot drinks you fill up near camp, so it isn\'t carried; it only sets how much gas the group needs. Food weights are always dry.</p></div>';
     var gas='<div class="card"><h3 style="margin-bottom:8px">Group gas</h3>'+
       '<div class="sum-row"><span>Canisters on the Group gear list</span><b>'+g.n+' × '+fmt(g.netEach)+' g gas</b></div>'+
-      '<div class="sum-row"><span>Water to boil each</span><b>'+P.litres_per_person_per_day+' L a day × '+(N-1)+' stove days</b></div>'+
+      '<div class="sum-row"><span>Water to boil each</span><b>'+fmt(boilL(),1)+' L a day × '+(N-1)+' stove days</b></div>'+
       '<div class="sum-row"><span>Burn rate, measured</span><b>'+P.group_g_per_litre_measured+' g per litre</b></div>'+
       '<div class="sum-row" style="border:0"><span>Group need for '+L.groupSize+' people</span><b>'+fmt(g.need)+' g of '+fmt(g.have)+' g</b></div>'+
       '<div class="'+(g.margin>=0?'okbox':'warnbox')+'">'+(g.margin>=0?'About '+fmt(g.margin)+' g spare across the group'+(g.have?', roughly '+fmt(g.margin/g.have*100)+'%.':'.'):'Short by about '+fmt(-g.margin)+' g. Add a canister on the Group gear tab.')+'</div>'+
@@ -1976,7 +1941,7 @@ var FOOD=(function(){
     var body;
     if(!m){
       body='<div class="card fd-start"><div class="eyebrow">Food calculator</div><h3>Start your menu</h3>'+
-        '<p>List what you\'ll eat each day, with grams. The planner adds up calories, protein, carbs and fat, checks them against your target, works out the hot water you need, and uses the weight on the Weight tab.</p>'+
+        '<p>List what you\'ll eat each day, with grams. The planner adds up calories, protein, carbs and fat, checks them against your target, and uses the weight on the Weight tab.</p>'+
         '<div class="toolbar"><button class="btn primary" data-fact="new" data-kind="starter">Start from the starter menu</button><button class="btn" data-fact="new" data-kind="empty">Start empty</button><button class="btn ghost" data-fact="impopen">Import a menu</button></div>'+(impOpen?impHTML():'')+(impMsg?'<p class="warnbox">'+esc(impMsg)+'</p>':'')+
         '<p class="note">The starter menu is the 10-day plan from Leon\'s master list: about 810 g and 3,450 kcal a day. Change anything in it.</p></div>';
     } else {
@@ -2022,7 +1987,6 @@ var FOOD=(function(){
       if(pc<40) out.push(['warn','Only about '+fmt(pc)+'% of the energy comes from carbohydrate. On long climbs carbs are the main fuel: oats, wraps, couscous, mash, dried fruit and sweets help.']);
       if(pf>50) out.push(['warn','About '+fmt(pf)+'% of the energy comes from fat. Light to carry, but appetite drops with altitude and very fatty food can be hard to get down: balance it with carbs.']); }
     if(bw&&mc.hasP){ var pk=mc.ppd/bw; if(pk<1.2) out.push(['warn','Protein is about '+fmt(mc.ppd)+' g a day ('+fmt(pk,1)+' g per kg). Trekking guidance is 1.2–2.0 g per kg: biltong, droëwors, cheese, milk powder, Future Life or a recovery shake help.']); }
-    var gp=+P.litres_per_person_per_day||0; if(mc.wml>gp*1000*1.1&&gp) out.push(['warn','Your menu needs about '+fmt(mc.wml/1000,1)+' L of boiled water a day; the group gas plan assumes '+fmt(gp,1)+' L each. Tell the group, or swap a cooked meal for a cold one.']);
     if(!(+f.spare>0)) out.push(['warn','No spare food. The sign-in at Sentinel Car Park asks whether you carry an extra day\'s food, and storm days on the escarpment are common: one spare day is the usual margin.']);
     return out;
   }
@@ -2037,7 +2001,6 @@ var FOOD=(function(){
       '<div class="tile"><div class="k">Food a day</div><div class="v">'+fmt(fd.perDay)+' g</div><div class="s">'+fmt(fd.dens)+' kcal per 100 g</div></div>'+
       '<div class="tile"><div class="k">Protein a day</div><div class="v">'+(mc.hasP?fmt(mc.ppd)+' g':'—')+'</div><div class="s">'+(mc.hasP&&bw?fmt(mc.ppd/bw,1)+' g per kg body weight':mc.hasP?'add body weight for g per kg':'add protein per 100 g')+'</div></div>'+
       '<div class="tile"><div class="k">Food to carry</div><div class="v">'+fmt(fd.total/1000,2)+' kg</div><div class="s">'+fmt(fd.days,fd.days%1?1:0)+' days ('+N+' + '+fmt(+f.spare||0,(+f.spare||0)%1?1:0)+' spare'+(fd.ownSpare?', '+fmt(fd.spareDay)+' g each':'')+')</div></div>'+
-      '<div class="tile"><div class="k">Hot water a day</div><div class="v">'+fmt(mc.wml/1000,1)+' L</div><div class="s">boiled for your menu · gas plan '+fmt(+P.litres_per_person_per_day||0,1)+' L</div></div>'+
       (function(){ var b=burnEst(); return '<div class="tile"><div class="k">Body weight by the end</div><div class="v">'+(b?(b.kg>0.05?'−'+fmt(b.kg,1)+' kg':'± 0 kg'):'—')+'</div><div class="s">'+(b?'burning about '+fmt(Math.round(b.perDay/50)*50)+' kcal a day':'add your body weight above')+'</div></div>'; })();
     $('fd-checks').innerHTML=checks(fd,mc).map(function(c){ return '<p class="'+(c[0]==='ok'?'okbox':'warnbox')+'">'+esc(c[1])+'</p>'; }).join('');
     var mx=Math.max.apply(null,MEALS.map(function(ml){return mc.meals[ml[0]].k;}).concat([1]));
@@ -2136,7 +2099,7 @@ var FOOD=(function(){
 })();
 function vFood(){ return FOOD.view(); }
 function updateFood(){
-  var f=food(); if($('f-water')) $('f-water').innerHTML=waterHTML(waterPlan());
+  var f=food();
   if($('f-day')){ $('f-day').textContent=fmt(f.perDay)+' g'; $('f-days').textContent=fmt(f.days,1); $('f-total').textContent=kg(f.total); $('f-kcal').textContent=fmt(f.kcal*f.days)+' kcal'; }
   FOOD.refresh();
 }
@@ -2238,7 +2201,6 @@ function bind(){
     else if(a==='days'){ var nd=+t.value; $('days-out').textContent=nd+' days'; clearTimeout(window._dt); window._dt=setTimeout(function(){ L.tripDays=nd===groupDays()?null:nd; persist(); setPlan(myDays()); MAP.replan(); renderRoute(viewEl('route')); var sl=document.querySelector('[data-act="days"]'); if(sl) sl.focus(); },120); }
     else if(t.dataset.fd||t.dataset.fq){ FOOD.input(t); }
     else if(t.dataset.lk&&linkEdit){ var li=+t.closest('[data-li]').dataset.li; if(linkEdit[li]) linkEdit[li][t.dataset.lk]=t.value; }
-    else if(t.hasAttribute&&t.hasAttribute('data-wsmall')){ L.food.smallW=t.checked; persist(); updateFood(); }
     else if(t.dataset.f==='bw'&&t.value===''){ delete L.food.bw; persist(); updateFood(); }
     else if(t.dataset.f){ var fv=num(t.value); if(fv!=null&&fv>=0){ L.food[t.dataset.f]=fv; persist(); updateFood(); } }
     else if(editing&&t.dataset.k){ draft[t.dataset.k]=t.value; }
@@ -3480,7 +3442,6 @@ var PEOPLE=(function(){
       if(t.classList&&t.classList.contains('pp-name')){ form.name=t.value; var r=mine(); if(r){ load(); clearTimeout(bind.t); bind.t=setTimeout(function(){ var a=document.activeElement, p=a&&a.selectionStart; paintForm(); var n=document.querySelector('.pp-name'); if(n){ n.focus(); try{ n.setSelectionRange(p,p); }catch(_){} } },400); } }
       else if(t.classList&&t.classList.contains('pl-name')){ form.name=t.value; } });
     document.addEventListener('click',function(e){ var b;
-      if((b=e.target.closest('[data-wstart]'))){ L.food.water=+b.dataset.wstart; persist(); rerender(); return; }
       if((b=e.target.closest('[data-ppseg]'))){ var p=b.dataset.ppseg.split(':'); form[p[0]]=p[1]; b.parentNode.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed',String(x===b)); }); return; }
       if(e.target.closest('[data-ppsave]')){ var name=(form.name||'').trim(), id=slug(name); if(!id){ say('Add your name first.','bad'); return; }
         var o={name:name,lift:form.lift||'',status:form.status||'in',at:new Date().toISOString()}; F.forEach(function(f){ o[f[0]]=str(form[f[0]],f[0]==='notes'?200:40).trim(); });
