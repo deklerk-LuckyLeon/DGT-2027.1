@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="dgt-build" content="74540e706f42">
+<meta name="dgt-build" content="3157da38c0bd">
 <title>DGT Trip Planner</title>
 <meta name="theme-color" content="#222324">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1107,9 +1107,11 @@ function endDate(){return TS()?addDays(TS(),N-1):'';}
 /* =========================================================
    Per-person state, saved in this browser
    ========================================================= */
+/* Group plan: the trail days plus buffer days for weather or delays. Food and gas cover both. */
+var BUFFER=2;
 function blankSetup(){return {st:{},custom:[],cats:[]};}
 var L={v:3,active:'A',names:{A:'Setup A',B:'Setup B'},lo:{A:blankSetup(),B:blankSetup()},groupSize:P.group_size,groupLoad:null,
-  food:{kcal:4500,dens:450,spare:1,water:1},prep:{},savedAt:null};
+  food:{kcal:4500,dens:450,spare:BUFFER,water:1},prep:{},savedAt:null};
 var storageOK=true;
 function loadState(){
   try{
@@ -1123,6 +1125,7 @@ function loadState(){
   }catch(e){ storageOK=false; }
 }
 loadState();
+loadFix();
 if(!L.gs4){ if(+L.groupSize===5) L.groupSize=4; L.gs4=1; }
 setPlan(myDays());
 function persist(){
@@ -1221,10 +1224,11 @@ function summary(lo){
 function boilL(){ var v=num(L.food.boil); return v!=null&&v>0?v:1; }
 function gasPlan(){
   var gs=Math.max(1,+L.groupSize||1);
-  var need=boilL()*(N-1)*P.group_g_per_litre_measured*gs;
+  var days=N-1+BUFFER, perDay=boilL()*P.group_g_per_litre_measured*gs, need=perDay*days;
   var lo=cur(), have=0, n=0;
   items(lo,'g').forEach(function(it){ if(it.fuel){ var s=stOf(lo,it.id); have+=consOf(it,s); n+=isOn(it,s)?qtyOf(it,s):0; } });
-  return {need:need,have:have,n:n,netEach:n?have/n:0,margin:have-need};
+  var each=n?have/n:230;
+  return {need:need,needTrail:perDay*(N-1),days:days,have:have,n:n,netEach:n?have/n:0,margin:have-need,cansNeed:Math.ceil(need/each)};
 }
 /* Rough energy use per trail day: walking about 0.5 kcal per kg (body + pack) per km, x1.35 for trackless grass and rock;
    climbing as lifting body + pack at 25% muscle efficiency (0.00938 kcal per kg per m); descending about a third of that;
@@ -1235,7 +1239,7 @@ function burnEst(){ var bw=num(L.food.bw); if(!bw) return null; var pk=packByDay
 function lossText(b){ if(!b) return ''; if(b.hi<0.3) return 'roughly even'; return 'about '+fmt(Math.max(0,b.kg),1)+' kg lighter'; }
 function packByDay(lo){
   var s=summary(lo||cur()),f=food(),g=gasPlan(),out=[];
-  var fuelBurn=s.fuel*Math.min(1,g.have?g.need/g.have:1);
+  var fuelBurn=s.fuel*Math.min(1,g.have?g.needTrail/g.have:1);
   for(var d=1;d<=N;d++){
     var foodLeft=f.perDay*(N-d+1)+(f.total-f.perDay*N);
     var fuelNow=Math.max(0,s.fuel-fuelBurn*((d-1)/N));
@@ -1367,7 +1371,7 @@ var ME=(function(){
     if(miss) todo.push(['#gear','Tick or replace '+miss+' essential item'+(miss>1?'s':'')+' in '+esc(L.names[L.active])]);
     if(!mc) todo.push(['#food','Build your food menu']);
     else if(short>50) todo.push(['#food','Your menu is about '+fmt(short)+' kcal a day short of your target']);
-    if(!(+f.spare>0)) todo.push(['#food','Add a spare day of food (asked at the Sentinel sign-in)']);
+    if(+f.spare<BUFFER) todo.push(['#food','Add food for the '+BUFFER+' buffer days']);
     if(gg&&!gg.items.length) todo.push(['#group','Choose the group gear you\'ll carry'+(gg.open?' ('+gg.open+' essentials still unclaimed)':'')]);
     if(prepLeft) todo.push(['#prep',prepLeft+' thing'+(prepLeft>1?'s':'')+' left on your before-you-go list']);
     var cd=''; if(TS()){ var n=daysBetween(today(),TS()); cd=n>0?n+' days to the start':(daysBetween(today(),endDate())>=0?'On the trail':'Trip completed'); }
@@ -1764,7 +1768,7 @@ function menuCalc(m){
 function food(){
   var f=L.food, days=N+(+f.spare||0), mc=menuCalc(fMenu());
   if(mc){ var pd=Math.round(mc.gpd), sp=+f.spare||0, spD=mc.spG?Math.round(mc.spG):pd; return {perDay:pd,days:days,total:pd*N+spD*sp,spareDay:spD,ownSpare:!!mc.spG,kcal:Math.round(mc.kpd),dens:mc.dens,menu:mc}; }
-  var perDay=Math.round(f.kcal/f.dens*100); return {perDay:perDay,days:days,total:perDay*days,kcal:+f.kcal,dens:+f.dens,menu:null};
+  var perDay=Math.round(f.kcal/f.dens*100); return {perDay:perDay,days:days,total:perDay*days,spareDay:perDay,ownSpare:false,kcal:+f.kcal,dens:+f.dens,menu:null};
 }
 
 var FOOD=(function(){
@@ -1799,9 +1803,9 @@ var FOOD=(function(){
     if(!items.length){ impMsg='Nothing to import. Use one line per food: Meal; Food; grams a day.'; rerender(); return; }
     var ms=fMenus(), m={id:fid(),name:(name||'Imported menu')+(ms.some(function(x){return x.name===name;})?' (2)':''),items:items};
     ms.push(m); L.food.active=m.id; impOpen=false; newOpen=false; pick=null;
-    var spSet=items.some(function(i){return i.meal==='sp';})&&!(+L.food.spare>0); if(spSet) L.food.spare=1;
+    var spSet=items.some(function(i){return i.meal==='sp';})&&!(+L.food.spare>0); if(spSet) L.food.spare=BUFFER;
     var noK=items.filter(function(i){return num(i.k)==null;}).length;
-    impMsg='Imported “'+m.name+'” with '+items.length+' foods.'+(noK?' '+noK+' need kcal per 100 g: they\'re marked below.':'')+(skipped.length?' Skipped '+skipped.length+' line'+(skipped.length>1?'s':'')+' that didn\'t read as Meal; Food; grams.':'')+(spSet?' Spare days of food was 0, so it\'s now 1 to carry the spare day.':'');
+    impMsg='Imported “'+m.name+'” with '+items.length+' foods.'+(noK?' '+noK+' need kcal per 100 g: they\'re marked below.':'')+(skipped.length?' Skipped '+skipped.length+' line'+(skipped.length>1?'s':'')+' that didn\'t read as Meal; Food; grams.':'')+(spSet?' Spare days of food was 0, so it\'s now '+BUFFER+' for the buffer days.':'');
     persist(); rerender(); }
   /* hand the menu over to the person's own Claude, with their numbers filled in; they paste the result back with Import */
   function kcalSet(){ var f=L.food; return !!f.kcalSet||+f.kcal!==4500; }
@@ -1820,7 +1824,7 @@ var FOOD=(function(){
       (kcalSet()?'My target: about '+fmt(+f.kcal)+' kcal a day':'I haven\'t worked out my calorie target yet')+(bw?', body weight '+bw+' kg, so roughly '+fmt(bw*1.4)+' to '+fmt(bw*1.8)+' g of protein a day':'')+'.'+
       (!bw||!kcalSet()?' Before planning, ask me for '+(!bw&&!kcalSet()?'my body weight, and suggest a daily calorie target from it':!bw?'my body weight':'a daily calorie target, suggesting one from my body weight')+'.':'')+' I want it as light as possible: high calories per gram, foods that keep for 10 days.\n\n'+
       (m&&m.items.length&&lvl<2?'Here is my current menu (meal; food; dry grams a day'+(lvl?'':'; then kcal, protein, carbs and fat per 100 g where known')+'). Improve it, and tell me what you changed and why:\n\n'+exportText(!!lvl)+'\n\n':m&&m.items.length?'I\'ll paste my current menu in my next message; improve it then.\n\n':'Before you plan, ask me a few quick questions: foods I like, foods I don\'t eat, and brands I already have.\n\n')+
-      'Include one lighter emergency spare day (about 500 g, no cooking needed).\n\n'+
+      'We plan '+N+' trail days plus '+BUFFER+' buffer days in case weather holds us up. Include one lighter spare day (about 500 g, mostly no cooking) that I carry '+BUFFER+' times.\n\n'+
       'Use DRY weights (as the food comes out of the pack, before water) and values per 100 g dry. When we are done, give me the final menu as plain text in exactly this format, one food per line, with nothing else in that block:\n\n'+
       'DGT menu: <menu name>\nMeal; Food; dry grams per day; kcal per 100 g; protein per 100 g; carbs per 100 g; fat per 100 g\n\n'+
       'Meal must be one of: Breakfast, Lunch, Trail snacks, Dinner, Drinks, Spare day.';
@@ -1918,7 +1922,7 @@ var FOOD=(function(){
     if(key[0]==='m'){ var id=key.slice(1); return fMine().filter(function(o){return o.id===id;})[0]; }
     return shared.filter(function(o){return o.key===key;})[0];
   }
-  function addFromPick(o){ var m=fMenu(); if(!m||!o) return; var it=itemFrom(o,pick); m.items.push(it); if(pick==='sp'&&!(+L.food.spare>0)){ L.food.spare=1; var sf=document.querySelector('[data-f="spare"]'); if(sf) sf.value=1; } persist();
+  function addFromPick(o){ var m=fMenu(); if(!m||!o) return; var it=itemFrom(o,pick); m.items.push(it); if(pick==='sp'&&!(+L.food.spare>0)){ L.food.spare=BUFFER; var sf=document.querySelector('[data-f="spare"]'); if(sf) sf.value=1; } persist();
     var sec=document.querySelector('[data-meal="'+pick+'"] .fd-rows'); if(sec){ sec.insertAdjacentHTML('beforeend',rowHTML(it)); }
     var msg=$('fp-msg'); if(msg){ msg.textContent='Added '+it.name+' ('+fmt(it.g)+' g a day). Pick more, or Done.'; }
     refresh(); }
@@ -1952,11 +1956,11 @@ var FOOD=(function(){
     var target='<div class="card"><h3 style="margin-bottom:8px">Your target</h3><div class="fields">'+
       '<label class="field">kcal a day<input type="number" step="100" min="1500" data-f="kcal" value="'+f.kcal+'"></label>'+
       '<label class="field">Body weight, kg<input type="number" step="1" min="35" max="160" data-f="bw" placeholder="optional" value="'+(f.bw||'')+'"></label>'+
-      '<label class="field">Spare days of food<input type="number" step="0.5" min="0" max="3" data-f="spare" value="'+f.spare+'"></label>'+
+      '<label class="field">Buffer days of food<input type="number" step="0.5" min="0" max="4" data-f="spare" value="'+f.spare+'"></label>'+
       (m?'':'<label class="field">kcal per 100 g<input type="number" step="10" min="200" max="700" data-f="dens" value="'+f.dens+'"></label>')+
       '</div><div class="fd-bw" id="f-bw"></div>'+
       (m?'':'<div style="margin-top:10px"><div class="sum-row"><span>Food per day</span><b id="f-day"></b></div>'+
-        '<div class="sum-row"><span>Days of food ('+N+' + spare)</span><b id="f-days"></b></div>'+
+        '<div class="sum-row"><span>Days of food ('+N+' + buffer)</span><b id="f-days"></b></div>'+
         '<div class="sum-row"><span>Total food to carry</span><b id="f-total"></b></div>'+
         '<div class="sum-row" style="border:0"><span>Total energy</span><b id="f-kcal"></b></div>'+
         '<p class="note">A quick estimate. Build a menu below to check it food by food.</p></div>')+'</div>';
@@ -1966,10 +1970,11 @@ var FOOD=(function(){
       '<p class="note">Water you carry counts in your pack weight. Water for cooking and hot drinks you fill up near camp, so it isn\'t carried; it only sets how much gas the group needs. Food weights are always dry.</p></div>';
     var gas='<div class="card"><h3 style="margin-bottom:8px">Group gas</h3>'+
       '<div class="sum-row"><span>Canisters on the Group gear list</span><b>'+g.n+' × '+fmt(g.netEach)+' g gas</b></div>'+
-      '<div class="sum-row"><span>Water to boil each</span><b>'+fmt(boilL(),1)+' L a day × '+(N-1)+' stove days</b></div>'+
+      '<div class="sum-row"><span>Water to boil each</span><b>'+fmt(boilL(),1)+' L a day × '+g.days+' stove days</b></div>'+
+      '<div class="sum-row"><span>Stove days</span><b>'+(N-1)+' nights + '+BUFFER+' buffer days</b></div>'+
       '<div class="sum-row"><span>Burn rate, measured</span><b>'+P.group_g_per_litre_measured+' g per litre</b></div>'+
       '<div class="sum-row" style="border:0"><span>Group need for '+L.groupSize+' people</span><b>'+fmt(g.need)+' g of '+fmt(g.have)+' g</b></div>'+
-      '<div class="'+(g.margin>=0?'okbox':'warnbox')+'">'+(g.margin>=0?'About '+fmt(g.margin)+' g spare across the group'+(g.have?', roughly '+fmt(g.margin/g.have*100)+'%.':'.'):'Short by about '+fmt(-g.margin)+' g. Add a canister on the Group gear tab.')+'</div>'+
+      '<div class="'+(g.margin>=0?'okbox':'warnbox')+'">'+(g.margin>=0?'About '+fmt(g.margin)+' g spare across the group'+(g.have?', roughly '+fmt(g.margin/g.have*100)+'%.':'.')+(g.n>g.cansNeed?' '+g.cansNeed+' canister'+(g.cansNeed>1?'s':'')+' would cover it, including the buffer days; each extra one is about 365 g full.':''):'Short by about '+fmt(-g.margin)+' g. You need '+g.cansNeed+' canisters; add one on the Group gear tab.')+'</div>'+
       '<p class="note">'+esc(P.burners||'')+'. The day-by-day pack chart is on the <a href="#weight">Weight</a> tab.</p></div>';
     var head='<div class="head" style="padding-top:12px"><div><h2>Food &amp; fuel</h2><p class="note">Build your own menu and check it has enough energy for '+N+' days on the escarpment. Pick foods from the list (about '+Math.round(FLIB.length/10)*10+' trail foods with typical values) or add your own from the label. Your menu is yours: it\'s saved with your gear, not shared.</p></div></div>';
     var body;
@@ -1987,7 +1992,7 @@ var FOOD=(function(){
       var meals=MEALS.map(function(ml){
         var its=m.items.filter(function(i){return i.meal===ml[0];});
         return '<section class="fd-meal'+(ml[0]==='sp'?' fd-spare':'')+'" data-meal="'+ml[0]+'"><div class="fd-mh"><h4>'+ml[1]+'</h4><span class="mono" id="fms-'+ml[0]+'"></span></div>'+
-          (ml[0]==='sp'?'<p class="note">What you carry for each spare day (set how many above). Leave it empty to carry a copy of an average day; a compact, dense spare day is lighter. It doesn\'t count in the daily averages.</p>':'')+
+          (ml[0]==='sp'?'<p class="note">What you carry for each buffer day (the group plans '+BUFFER+'; set yours above). Leave it empty to carry a copy of an average day; a compact, dense spare day is lighter. It doesn\'t count in the daily averages.</p>':'')+
           '<div class="fd-rows">'+its.map(rowHTML).join('')+'</div>'+
           (pick===ml[0]?pickerHTML(ml[0]):'<button class="fd-addbtn" data-fact="pick" data-meal-add="'+ml[0]+'">+ Add to '+ml[1].toLowerCase()+'</button>')+'</section>';
       }).join('');
@@ -2022,8 +2027,7 @@ var FOOD=(function(){
       if(pc<40) out.push(['warn','Only about '+fmt(pc)+'% of the energy comes from carbohydrate. On long climbs carbs are the main fuel: oats, wraps, couscous, mash, dried fruit and sweets help.']);
       if(pf>50) out.push(['warn','About '+fmt(pf)+'% of the energy comes from fat. Light to carry, but appetite drops with altitude and very fatty food can be hard to get down: balance it with carbs.']); }
     if(bw&&mc.hasP){ var pk=mc.ppd/bw; if(pk<1.2) out.push(['warn','Protein is about '+fmt(mc.ppd)+' g a day ('+fmt(pk,1)+' g per kg). Trekking guidance is 1.2–2.0 g per kg: biltong, droëwors, cheese, milk powder, Future Life or a recovery shake help.']); }
-    if(!(+f.spare>0)&&mc.spG) out.push(['warn','You\'ve planned a spare day ('+fmt(mc.spG)+' g) but spare days of food is 0, so it isn\'t in your pack weight. <button class="linkbtn" data-fact="spare1">Carry it (set spare days to 1)</button>',true]);
-    else if(!(+f.spare>0)) out.push(['warn','No spare food. The sign-in at Sentinel Car Park asks whether you carry an extra day\'s food, and storm days on the escarpment are common: one spare day is the usual margin.']);
+    if(+f.spare<BUFFER) out.push(['warn','The group plans '+N+' trail days plus '+BUFFER+' buffer days for weather or delays, but you carry food for '+fmt(+f.spare||0,1)+' buffer day'+(+f.spare===1?'':'s')+'.'+(mc.spG?' Your spare day is '+fmt(mc.spG)+' g.':'')+' <button class="linkbtn" data-fact="spare1">Carry '+BUFFER+' buffer days</button>',true]);
     var gc=summary(cur()).consOther, hasDr=fMenu().items.some(function(i){return i.meal==='dr'&&num(i.g);});
     if(gc>0&&hasDr) out.push(['warn','Your gear list also has '+fmt(gc)+' g ticked under Other consumables (drink mixes, coffee). If those are the same drinks as in this menu, untick them in My gear so they aren\'t counted twice.']);
     return out;
@@ -2038,7 +2042,7 @@ var FOOD=(function(){
       '<div class="tile'+(short?' fd-short':'')+'"><div class="k">Energy a day</div><div class="v">'+fmt(fd.kcal)+'</div><div class="s">kcal · target '+fmt(t)+(t?' · '+(diff>=0?'+':'−')+fmt(Math.abs(diff)):'')+'</div></div>'+
       '<div class="tile"><div class="k">Food a day</div><div class="v">'+fmt(fd.perDay)+' g</div><div class="s">'+fmt(fd.dens)+' kcal per 100 g</div></div>'+
       '<div class="tile"><div class="k">Protein a day</div><div class="v">'+(mc.hasP?fmt(mc.ppd)+' g':'—')+'</div><div class="s">'+(mc.hasP&&bw?fmt(mc.ppd/bw,1)+' g per kg body weight':mc.hasP?'add body weight for g per kg':'add protein per 100 g')+'</div></div>'+
-      '<div class="tile"><div class="k">Food to carry</div><div class="v">'+fmt(fd.total/1000,2)+' kg</div><div class="s">'+fmt(fd.days,fd.days%1?1:0)+' days'+(+f.spare>0?' ('+N+' + '+fmt(+f.spare,(+f.spare)%1?1:0)+' spare'+(fd.ownSpare?', '+fmt(fd.spareDay)+' g each':'')+')':', no spare day counted')+'</div></div>'+
+      '<div class="tile"><div class="k">Food to carry</div><div class="v">'+fmt(fd.total/1000,2)+' kg</div><div class="s">'+fmt(fd.days,fd.days%1?1:0)+' days'+(+f.spare>0?' ('+N+' + '+fmt(+f.spare,(+f.spare)%1?1:0)+' buffer'+(fd.ownSpare?', '+fmt(fd.spareDay)+' g each':'')+')':', no buffer days counted')+'</div></div>'+
       (function(){ var b=burnEst(); return '<div class="tile"><div class="k">Body weight by the end</div><div class="v">'+(b?(b.kg>0.05?'−'+fmt(b.kg,1)+' kg':'± 0 kg'):'—')+'</div><div class="s">'+(b?'burning about '+fmt(Math.round(b.perDay/50)*50)+' kcal a day':'add your body weight above')+'</div></div>'; })();
     $('fd-checks').innerHTML=checks(fd,mc).map(function(c){ return '<p class="'+(c[0]==='ok'?'okbox':'warnbox')+'">'+(c[2]?c[1]:esc(c[1]))+'</p>'; }).join('');
     var mx=Math.max.apply(null,MEALS.map(function(ml){return mc.meals[ml[0]].k;}).concat([1]));
@@ -2075,7 +2079,7 @@ var FOOD=(function(){
     try{ navigator.clipboard.writeText(txt).then(function(){ out.hidden=true; m.textContent=msg; },function(){ out.hidden=false; out.select(); m.textContent='Select the text below and copy it.'; }); }catch(_){ out.hidden=false; out.select(); m.textContent='Select the text below and copy it.'; } }
   function totalFor(it){ var f=L.food, sp=+f.spare||0, own=(menuCalc(fMenu())||{}).spG; if(it.meal==='sp') return Math.ceil((num(it.g)||0)*sp/5)*5; var sc2=N?(N+(own?0:sp))/N:1; return Math.ceil((num(it.g)||0)*fDays(it)*sc2/5)*5; }
   function shopText(){ var m=fMenu(), f=L.food, fd=food();
-    return 'DGT 2027 food: '+(m.name||'Menu')+'\n'+N+' trail days + '+fmt(+f.spare||0,1)+' spare · '+fmt(fd.kcal)+' kcal and '+fmt(fd.perDay)+' g a day · '+kg(fd.total)+' in total\n'+
+    return 'DGT 2027 food: '+(m.name||'Menu')+'\n'+N+' trail days + '+fmt(+f.spare||0,1)+' buffer · '+fmt(fd.kcal)+' kcal and '+fmt(fd.perDay)+' g a day · '+kg(fd.total)+' in total\n'+
       MEALS.map(function(ml){ var its=m.items.filter(function(i){return i.meal===ml[0]&&num(i.g);}); if(!its.length) return '';
         return '\n'+ml[1]+'\n'+its.map(function(i){ return '- '+i.name+': '+fmt(totalFor(i))+' g ('+fmt(num(i.g))+' g × '+(i.days==null?'every day':fmt(fDays(i))+' days')+')'; }).join('\n'); }).join('')+'\n'; }
   function tsv(){ var m=fMenu(), rows=[['Meal','Food','g a day','Days','kcal per 100 g','Protein per 100 g','Carbs per 100 g','Fat per 100 g','kcal a day','Total to buy (g)']];
@@ -2088,7 +2092,7 @@ var FOOD=(function(){
     var m=fMenu(), f=L.food, fd=food(), mc=fd.menu; if(!mc){ out.textContent='Add some foods first.'; return; }
     var lines=m.items.map(function(i){ return (MEAL_NAME[i.meal]||i.meal)+' | '+i.name+' | '+(num(i.g)||0)+' g/day'+(i.days==null?'':' on '+fDays(i)+' of '+N+' days')+' | '+(num(i.k)==null?'kcal unknown':num(i.k)+' kcal/100 g')+(i.p==null?'':' | P'+i.p)+(i.c==null?'':' C'+i.c)+(i.f==null?'':' F'+i.f)+(i.w?' | needs hot water':''); });
     var prompt='You are an expedition nutritionist. Check this hiker\'s daily food plan for the Drakensberg Grand Traverse: about '+fmt(totalKm)+' km and '+fmt(totalUp)+' m of ascent over '+N+' days, unsupported, mostly trackless on the 2,800–3,400 m escarpment in March. Nights can drop below freezing, afternoons often bring storms; water is plentiful. They cook dinner and hot drinks on a shared gas stove and want to keep fuel use sensible.\n\n'+
-      'Target '+fmt(+f.kcal||0)+' kcal a day'+(num(f.bw)?', body weight '+num(f.bw)+' kg':'')+', '+fmt(+f.spare||0,1)+' spare day(s). The plan averages '+fmt(fd.kcal)+' kcal and '+fmt(fd.perDay)+' g a day ('+fmt(fd.dens)+' kcal per 100 g)'+(mc.hasP?', about '+fmt(mc.ppd)+' g protein':'')+(mc.kMac?', '+fmt(mc.cpd)+' g carbohydrate and '+fmt(mc.fpd)+' g fat':'')+', and about '+fmt(mc.wml/1000,1)+' L of boiled water a day.\n\nItems (meal | food | grams | energy | protein/carbs/fat per 100 g):\n'+lines.join('\n')+
+      'Target '+fmt(+f.kcal||0)+' kcal a day'+(num(f.bw)?', body weight '+num(f.bw)+' kg':'')+', '+fmt(+f.spare||0,1)+' buffer day(s). The plan averages '+fmt(fd.kcal)+' kcal and '+fmt(fd.perDay)+' g a day ('+fmt(fd.dens)+' kcal per 100 g)'+(mc.hasP?', about '+fmt(mc.ppd)+' g protein':'')+(mc.kMac?', '+fmt(mc.cpd)+' g carbohydrate and '+fmt(mc.fpd)+' g fat':'')+', and about '+fmt(mc.wml/1000,1)+' L of boiled water a day.\n\nItems (meal | food | grams | energy | protein/carbs/fat per 100 g):\n'+lines.join('\n')+
       '\n\nAnswer in plain text, no tables, under 280 words: 1) is the energy enough for this trip, and is the target itself sensible; 2) the balance of carbohydrate, fat and protein, and anything missing (salt, fibre, variety); 3) practical issues: food that gets hard, melts, goes off or crumbles, cooking time and fuel, appetite at altitude; 4) the three most useful changes, each with grams and the kcal or weight effect. Flag any kcal values that look wrong for that food.';
     busy=true; btn.disabled=true; out.textContent='Thinking…';
     try{ var r=await sample(prompt,{onText:function(p){ out.textContent=p.text; }}); out.textContent=r.text; }
@@ -2119,7 +2123,7 @@ var FOOD=(function(){
     if(a==='nfcancel'){ creating=false; var el2=document.querySelector('.fd-pick'); if(el2) el2.outerHTML=pickerHTML(pick); return; }
     if(a==='usesg'){ var sg=suggestKcal(); if(sg){ L.food.kcal=sg; L.food.kcalSet=true; persist(); document.querySelectorAll('[data-f="kcal"]').forEach(function(x){ x.value=sg; }); updateFood(); } return; }
     if(a==='cgclose'){ var g=$('fd-cgate'); if(g) g.remove(); return; }
-    if(a==='spare1'){ L.food.spare=1; persist(); rerender(); return; }
+    if(a==='spare1'){ L.food.spare=BUFFER; persist(); rerender(); return; }
     if(a==='nfsave'){ saveNew(); return; }
     if(a==='nfmode'){ var bx=b.closest('.fp-new'); if(bx){ bx.dataset.mode=b.dataset.m; bx.querySelectorAll('[data-fact="nfmode"]').forEach(function(x){ x.setAttribute('aria-pressed',String(x===b)); }); } return; }
     if(a==='mdel'){ if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='Remove?'; b.classList.add('armed'); return; } delMine(b.dataset.id); return; }
@@ -2351,7 +2355,7 @@ function sheetRows(){ var r=gearRows(), m=fMenu(), fd=food(); if(!m||!m.items.le
 function totalsRows(r){ var s=summary(cur()), k=function(g){ return Math.round(g)/1000; }, nm=L.names[L.active];
   r.push(['','','','','','','','','']);
   r.push(['Totals','As in the planner, setup '+nm,'','','','','','','kg']);
-  [['Base weight (your gear + group gear you carry)',s.base],['Worn',s.worn],['Food (incl. spare days)',s.food],['Water carried',s.water],['Gas and other consumables',s.fuel+s.consOther],['Pack at the start',s.pack],['Skin-out (pack + worn)',s.skin]]
+  [['Base weight (your gear + group gear you carry)',s.base],['Worn',s.worn],['Food (incl. buffer days)',s.food],['Water carried',s.water],['Gas and other consumables',s.fuel+s.consOther],['Pack at the start',s.pack],['Skin-out (pack + worn)',s.skin]]
     .forEach(function(x){ r.push(['Totals',x[0],'','','','','','',k(x[1])]); });
   if(estList(s).length) r.push(['Totals','Estimate: '+estList(s).join('; ').replace(/&amp;/g,'&'),'','','','','','','']);
   return r; }
@@ -2385,7 +2389,7 @@ function restoreFrom(text){
     msg.className='msg ok'; msg.textContent='Restored. Your gear is now on My gear and Weight.'; setTimeout(rerender,900);
   }catch(_){ msg.className='msg bad'; msg.textContent='That code could not be read. Make sure you pasted all of it, or load the .txt file instead.'; }
 }
-function loadFix(){ ['A','B'].forEach(function(k){ var lo=L.lo[k]=L.lo[k]||blankSetup(); lo.st=lo.st||{}; lo.custom=lo.custom||[]; lo.cats=lo.cats||[]; }); }
+function loadFix(){ if(!L.buf2){ L.food=L.food||{}; if(!(+L.food.spare>=BUFFER)) L.food.spare=BUFFER; L.buf2=1; } ['A','B'].forEach(function(k){ var lo=L.lo[k]=L.lo[k]||blankSetup(); lo.st=lo.st||{}; lo.custom=lo.custom||[]; lo.cats=lo.cats||[]; }); }
 function partSet(t,k,v){
   var box=t.closest('[data-pfor]'), it=findItem(box.dataset.pfor), pid=t.closest('.part').dataset.pid, s=wst(cur(),it.id);
   var xp=(s.xp||[]).filter(function(p){return p.id===pid;})[0];
@@ -3221,7 +3225,8 @@ var ADVICE=(function(){
     var f=L.food, fd=food();
     if(fd.dens&&fd.dens<500){ var lighter=Math.round(fd.kcal/500*100)*fd.days; if(fd.total-lighter>0) tips.push({g:fd.total-lighter,k:'food',t:'Food energy density',
       x:'At '+fmt(fd.dens)+' kcal per 100 g, '+fmt(fd.kcal)+' kcal a day weighs '+fmt(fd.perDay)+' g. At 500 kcal per 100 g (more nuts, oils, nut butter, chocolate, dried meat) it would weigh '+fmt(Math.round(fd.kcal/500*100))+' g a day.'+(fd.menu?' Your menu is on the Food & fuel tab.':'')}); }
-    if(+f.spare>1) tips.push({g:(+f.spare-1)*fd.perDay,k:'food',t:'Spare food',x:'You\'re carrying '+fmt(f.spare)+' spare days. One spare day is the usual margin; each extra day is '+fmt(fd.perDay)+' g.'});
+    if(+f.spare>BUFFER) tips.push({g:(+f.spare-BUFFER)*fd.spareDay,k:'food',t:'Buffer food',x:'You\'re carrying '+fmt(f.spare)+' buffer days; the group plans '+BUFFER+'. Each extra day is '+fmt(fd.spareDay)+' g.'});
+    if(!fd.ownSpare&&+f.spare>0&&fd.perDay>650) tips.push({g:Math.round((fd.perDay-550)*f.spare),k:'food',t:'Lighter buffer days',x:'Your '+fmt(f.spare)+' buffer days are counted as full days ('+fmt(fd.perDay)+' g each). A compact spare day of dense food (nuts, chocolate, dried meat, a cold-soak meal) is about 550 g. Add it under Spare day in your menu.'});
     if(+f.water>1.5) tips.push({g:(+f.water-1)*1000,k:'water',t:'Water at the start',x:'You start with '+fmt(f.water,1)+' L. Water is plentiful in March; carrying 1 L between sources saves '+fmt((+f.water-1)*1000)+' g.'});
     var gs=Math.max(1,+L.groupSize||1), even=s.group/gs;
     if(L.groupLoad!=null&&s.share>even*1.2&&s.share-even>=150) tips.push({g:s.share-even,k:'group',t:'Your share of group gear',x:'You carry '+kg(s.share)+' of group kit; an even split is '+kg(even)+'. Fine if agreed, but it\'s the easiest weight to hand on.'});
