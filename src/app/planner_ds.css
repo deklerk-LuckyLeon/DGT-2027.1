@@ -635,3 +635,11 @@ body{font-size:16px}
 .fd-cgate{margin:12px 0;padding:14px 16px;border-radius:var(--r-sm);background:var(--accent-soft)}
 .fd-cgate h4{margin:0 0 4px;font-size:16px}
 .fd-imp .okbox{margin-top:0}
+
+/* Training: last 8 weeks */
+.tr-hist{display:flex;gap:6px;align-items:flex-end;margin-top:8px}
+.tr-wk{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px}
+.tr-wk i{display:block;width:100%;max-width:28px;height:0;min-height:2px;background:var(--accent);border-radius:3px 3px 0 0;opacity:.85}
+.tr-wk{height:64px;justify-content:flex-end}
+.tr-wk b{font-weight:400;font-size:10px;color:var(--faint);white-space:nowrap}
+.tr-wk.now b{color:var(--fg)}

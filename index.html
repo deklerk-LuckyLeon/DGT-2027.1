@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="dgt-build" content="2328acff45d0">
+<meta name="dgt-build" content="f811bf453bcb">
 <title>DGT Trip Planner</title>
 <meta name="theme-color" content="#222324">
 <link rel="manifest" href="manifest.webmanifest">
@@ -959,6 +959,14 @@ body{font-size:16px}
 .fd-cgate{margin:12px 0;padding:14px 16px;border-radius:var(--r-sm);background:var(--accent-soft)}
 .fd-cgate h4{margin:0 0 4px;font-size:16px}
 .fd-imp .okbox{margin-top:0}
+
+/* Training: last 8 weeks */
+.tr-hist{display:flex;gap:6px;align-items:flex-end;margin-top:8px}
+.tr-wk{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px}
+.tr-wk i{display:block;width:100%;max-width:28px;height:0;min-height:2px;background:var(--accent);border-radius:3px 3px 0 0;opacity:.85}
+.tr-wk{height:64px;justify-content:flex-end}
+.tr-wk b{font-weight:400;font-size:10px;color:var(--faint);white-space:nowrap}
+.tr-wk.now b{color:var(--fg)}
 
 /* ---- website: sign-in gate ---- */
 .gate{position:fixed;inset:0;z-index:200;background:var(--surface);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:max(24px,env(safe-area-inset-top)) 16px 24px}
@@ -2208,12 +2216,56 @@ function editForm(){
 }
 
 /* ----- training & prep ----- */
+/* Kettlebell sessions for one bell (written for 16–24 kg). A and B alternate; both work legs, back, shoulders and core for a loaded pack. */
+var KB={
+  warm:'5 min warm-up: halos ×5 each way, 10 bodyweight squats, 10 hip hinges, 10 arm circles.',
+  A:{name:'Kettlebell A: legs and back',items:[
+    ['Goblet squat','3 × 10','Bell at your chest, 3 seconds down. Your strength for long descents.'],
+    ['Single-arm bent-over row','3 × 10 each side','Free hand on a chair, flat back, pull the bell to your hip. Upper back for carrying the pack.'],
+    ['Reverse lunge','3 × 8 each leg','Bell at your chest, slow on the way down. Protects your knees on steep descents.'],
+    ['Two-hand swing','3 × 15','Power from your hips, arms just hold on. Hips and lower back.'],
+    ['Suitcase carry','3 × 40 m each side','Walk tall with the bell in one hand. Core strength against a heavy pack.']]},
+  B:{name:'Kettlebell B: climbing and shoulders',items:[
+    ['Step-up','3 × 10 each leg','Onto a chair or bench, bell at your chest. The closest thing to the passes.'],
+    ['Single-leg deadlift','3 × 8 each leg','Bell in the opposite hand. Balance on rough ground.'],
+    ['Half-kneeling single-arm press','3 × 5–8 each side','If 20 kg is too heavy for 5 clean reps, do 3 × 10–15 push-ups instead.'],
+    ['Shrug','3 × 15','Bell in both hands, shoulders up and hold a second. Traps take the pack straps.'],
+    ['Halo','3 × 5 each way','Circle the bell slowly around your head. Shoulder mobility.'],
+    ['Plank or dead bug','3 × 30–45 s','Core for a stable pack on uneven ground.']]},
+  prog:[['Base (to 20 Dec)','3 rounds, about 30 minutes. Lunges and step-ups without the bell at first if 20 kg is too much.'],
+    ['Holiday hold','One session a week, either A or B.'],
+    ['Build (Jan – early Feb)','Add reps (squat 12–15, step-up 12) or a 4th round. Do the step-ups wearing your pack with 12–15 kg.'],
+    ['Peak (Feb)','One session a week; the other becomes loaded stairs or step-ups with your full pack.'],
+    ['Taper (March)','One light session, 2 rounds. Stop 5 days before you fly.']]
+};
+function trS(){ var t=L.train=L.train||{}; if(!t.cardio) t.cardio='Cardio, 45–60 min (ride, run or brisk walk)'; if(t.nc==null) t.nc=2; if(t.nkb==null) t.nkb=2; t.log=t.log||{}; return t; }
+function weekKey(d){ var x=parseD(d||today()), wd=(x.getUTCDay()+6)%7; return addDays(iso(x),-wd); }
+function weekSessions(){ var t=trS(), out=[], i;
+  for(i=0;i<t.nc;i++) out.push(['c'+i,t.cardio]);
+  for(i=0;i<t.nkb;i++) out.push(['k'+i,i%2?KB.B.name:KB.A.name]);
+  out.push(['h','Long weekend hike with your pack']);
+  return out; }
 function vTraining(){
-  var t=today();
+  var t=today(), tr=trS(), wk=weekKey(), log=tr.log[wk]||{}, ses=weekSessions();
+  var ph=S.training.filter(function(p){return t>=p.from&&t<=p.to;})[0];
   var rows=S.training.map(function(p){var now=t>=p.from&&t<=p.to;
     return '<tr'+(now?' class="now"':'')+'><td><b>'+esc(p.phase)+'</b>'+(now?' <span class="pill acc">now</span>':'')+'<span class="sub">Weeks '+esc(p.weeks)+' · '+esc(short(p.from))+' – '+esc(short(p.to))+'</span></td><td>'+esc(p.focus)+'</td><td>'+esc(p.long)+'</td></tr>';}).join('');
-  return '<div class="head" style="padding-top:12px"><h2>Training</h2></div>'+(t<S.training[0].from?'<p class="note">Training starts '+esc(nice(S.training[0].from,true))+'.</p>':'')+
-    '<div class="card scroll"><table class="t"><thead><tr><th>Phase</th><th>Weekly sessions</th><th>Long weekend walk</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  var done=ses.filter(function(x){return log[x[0]];}).length;
+  var hist=[], w0=weekKey(S.training[0].from); for(var w=7;w>=0;w--){ var k=addDays(wk,-7*w); if(k<w0) continue; var l=tr.log[k]||{}, n=Object.keys(l).filter(function(z){return l[z];}).length; hist.push('<span class="tr-wk'+(k===wk?' now':'')+'" title="Week of '+esc(nice(k))+': '+n+' done"><i style="height:'+Math.min(100,n/ses.length*100)+'%"></i><b>'+short(k).replace(/ \d{4}$/,'')+'</b></span>'); }
+  var mine='<div class="card"><h3 style="margin-bottom:6px">My week</h3>'+
+    '<p class="note">Week of '+esc(nice(wk,true))+(ph?' · '+esc(ph.phase)+' phase: long hike '+esc(ph.long):'')+'. Ticks are saved with your planner data.</p>'+
+    '<div class="fields"><label class="field">My cardio<input type="text" data-trs="cardio" value="'+esc(tr.cardio)+'"></label>'+
+    '<label class="field">Cardio sessions a week<input type="number" min="0" max="5" step="1" data-trs="nc" value="'+tr.nc+'"></label>'+
+    '<label class="field">Kettlebell sessions a week<input type="number" min="0" max="3" step="1" data-trs="nkb" value="'+tr.nkb+'"></label></div>'+
+    '<ul class="prep" style="margin-top:10px">'+ses.map(function(x){return '<li><label><input type="checkbox" data-tr="'+x[0]+'"'+(log[x[0]]?' checked':'')+'><span>'+esc(x[1])+'</span></label></li>';}).join('')+'</ul>'+
+    '<p class="note"><b id="tr-n">'+done+'</b> of '+ses.length+' done this week.</p>'+
+    (hist.length>1?'<div class="tr-hist" aria-label="Sessions done, last 8 weeks">'+hist.join('')+'</div>':'')+'</div>';
+  function kbCard(k){ var c=KB[k]; return '<div class="card"><h3 style="margin-bottom:6px">'+esc(c.name)+'</h3><p class="note">'+esc(KB.warm)+' Rest about a minute between exercises.</p>'+
+    '<div class="scroll"><table class="t"><thead><tr><th>Exercise</th><th>Sets × reps</th><th>How and why</th></tr></thead><tbody>'+c.items.map(function(i){return '<tr><td><b>'+esc(i[0])+'</b></td><td style="white-space:nowrap">'+esc(i[1])+'</td><td>'+esc(i[2])+'</td></tr>';}).join('')+'</tbody></table></div></div>'; }
+  var prog='<div class="card"><h3 style="margin-bottom:6px">How the kettlebell sessions change</h3><ul class="prep">'+KB.prog.map(function(p){return '<li><span><b>'+esc(p[0])+':</b> '+esc(p[1])+'</span></li>';}).join('')+'</ul></div>';
+  return '<div class="head" style="padding-top:12px"><div><h2>Training</h2><p class="note">The group plan by phase, your own week to tick off, and two kettlebell sessions that work legs, back and shoulders for a loaded pack.</p></div></div>'+(t<S.training[0].from?'<p class="note">Training starts '+esc(nice(S.training[0].from,true))+'.</p>':'')+
+    mine+'<div class="card scroll"><table class="t"><thead><tr><th>Phase</th><th>Weekly sessions</th><th>Long weekend walk</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    kbCard('A')+kbCard('B')+prog;
 }
 function vPrep(){
   var done=S.prep.filter(function(p){return L.prep[p.id];}).length;
@@ -2233,6 +2285,8 @@ function bind(){
     if(t.dataset.act==='on'&&row){ var it=findItem(row.dataset.id); wst(cur(),it.id).on=t.checked; row.classList.toggle('off',!t.checked); persist(); updateGear(); }
     else if(t.dataset.act==='pon'){ partSet(t,'on',t.checked); t.closest('.part').classList.toggle('off',!t.checked); }
     else if(t.id==='restore-file'&&t.files&&t.files[0]){ var fr=new FileReader(); fr.onload=function(){ restoreFrom(fr.result); }; fr.readAsText(t.files[0]); t.value=''; }
+    else if(t.dataset.tr){ var tr=trS(), wk=weekKey(), lg=tr.log[wk]=tr.log[wk]||{}; if(t.checked) lg[t.dataset.tr]=1; else delete lg[t.dataset.tr]; persist(); var n=$('tr-n'); if(n) n.textContent=weekSessions().filter(function(x){return lg[x[0]];}).length; }
+    else if(t.dataset.trs){ var tr2=trS(), k2=t.dataset.trs; if(k2==='cardio') tr2.cardio=t.value.trim()||'Cardio'; else { var v2=parseInt(t.value,10); tr2[k2]=isNaN(v2)?tr2[k2]:Math.max(0,Math.min(k2==='nc'?5:3,v2)); } persist(); rerender(); }
     else if(t.dataset.prep){ if(t.checked) L.prep[t.dataset.prep]=true; else delete L.prep[t.dataset.prep]; persist(); $('prep-n').textContent=S.prep.filter(function(p){return L.prep[p.id];}).length; }
     else if(t.dataset.act==='rename'){ L.names[t.dataset.k]=t.value.trim()||('Setup '+t.dataset.k); persist(); rerender(); }
     else if(editing&&t.dataset.k){ draft[t.dataset.k]=t.value; }
