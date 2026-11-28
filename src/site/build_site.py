@@ -36,7 +36,7 @@ css = rd('planner_css.css')
 css = re.sub(r'nav\.jump[^\n]*\n', '', css).replace('*{box-sizing:border-box}', '*{box-sizing:border-box}\n[hidden]{display:none!important}', 1)
 css = css.replace('minmax(150px,1fr));gap:10px}', 'minmax(140px,1fr));gap:10px}', 1)
 topo = 'url("data:image/svg+xml,' + urllib.parse.quote(rd('topo_mask.svg'), safe=" =:/,'.-") + '")'
-css += rd('planner3_extra.css') + "\n@media (max-width:520px){.item .nq{display:none}}\n" + rd('planner3_map.css') + '\n:root{--topo:' + topo + '}\n' + rd('planner_ds.css')
+css += rd('planner3_extra.css') + "\n@media (max-width:520px){.item .nq{display:none}}\n" + rd('planner3_map.css') + '\n:root{--topo:' + topo + '}\n' + rd('planner_ds.css') + '\n' + rd('planner_b.css')
 css += open(os.path.join(HERE, 'site.css'), encoding='utf-8').read()
 assert '</style' not in css.lower()
 

@@ -253,7 +253,7 @@ function packByDay(lo){
 /* =========================================================
    Shell: tabs and views
    ========================================================= */
-var VIEWS=[['overview','Overview'],['people','Group & travel'],['trip','Dates & bookings'],['links','Links'],['route','Route map'],['weather','Weather'],['safety','Safety'],['gear','My gear'],['group','Group gear'],['weight','Weight'],['compare','Compare A/B'],['food','Food & fuel'],['training','Training'],['prep','Before you go']];
+var VIEWS=[['overview','Home'],['people','Group & travel'],['trip','Dates & bookings'],['links','Links'],['route','Route map'],['weather','Weather'],['safety','Safety'],['gear','My gear'],['group','Group gear'],['weight','Weight'],['compare','Compare A/B'],['food','Food & fuel'],['training','Training'],['prep','Before you go']];
 var view='overview';
 function parseHash(){
   var h=(location.hash||'').slice(1), m=/^day-(\d+)$/.exec(h);
@@ -262,15 +262,20 @@ function parseHash(){
   return {v:'overview',day:0};
 }
 var GROUP_NAMES=['Leon','Duncan','Christian','Stefan'];
-var VGROUPS=[['plan','Plan',['overview','people','trip','links']],['route','Route',['route','weather','safety']],['kit','Kit',['gear','group','weight','compare']],['food','Food & prep',['food','training','prep']]];
+var VGROUPS=[['plan','Trip',['overview','trip','links']],['route','Route',['route','weather','safety']],['kit','Kit',['gear','weight','compare']],['food','Food',['food','training','prep']],['grp','Group',['group','people']]];
+var GICON={plan:'<path d="M3 19l6-10 4 6 3-4 5 8z"/>',route:'<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',kit:'<rect x="6" y="6" width="12" height="15" rx="3"/><path d="M9 6V4h6v2M6 12h12"/>',food:'<path d="M4 11h16a8 8 0 01-16 0zM12 3v4M8 5v2M16 5v2"/>',grp:'<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c3 0 6 1.8 6 5.5"/>'};
+function gIcon(k){ return '<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+GICON[k]+'</svg>'; }
+function myInitial(){ var n=ME.name(); return n?n.charAt(0).toUpperCase():'?'; }
 function groupOf(v){ for(var i=0;i<VGROUPS.length;i++) if(VGROUPS[i][2].indexOf(v)>=0) return VGROUPS[i]; return VGROUPS[0]; }
 function shell(){
   $('app').innerHTML='<datalist id="dgt-names">'+GROUP_NAMES.map(function(n){return '<option value="'+n+'">';}).join('')+'</datalist>'+'<div class="wrap" style="gap:18px;padding-top:0">'+
-    '<div class="topbar"><div class="in tb-top"><a class="tb-mark" href="#overview" aria-label="DGT trip planner: overview">DGT</a><nav class="tb-groups" aria-label="Sections">'+
-      VGROUPS.map(function(g){return '<a href="#'+g[2][0]+'" data-group="'+g[0]+'">'+g[1]+'</a>';}).join('')+'</nav></div>'+
+    '<div class="topbar"><div class="in tb-top"><a class="tb-mark" href="#overview" aria-label="DGT trip planner: home">DGT</a><nav class="tb-groups" aria-label="Sections">'+
+      VGROUPS.map(function(g){return '<a href="#'+g[2][0]+'" data-group="'+g[0]+'">'+g[1]+'</a>';}).join('')+'</nav>'+
+      '<span class="tb-me"><img class="tb-badge" src="'+BADGE+'" alt="" width="40" height="40"><a class="tb-av" id="tb-av" href="#people" aria-label="You, on Group &amp; travel">'+esc(myInitial())+'</a></span></div>'+
       '<div class="in tb-sub"><nav class="tabs" aria-label="Pages in this section">'+
       VIEWS.map(function(v){return '<a href="#'+v[0]+'" data-tab="'+v[0]+'" data-g="'+groupOf(v[0])[0]+'">'+v[1]+'</a>';}).join('')+
     '</nav><span class="saved" id="saved"></span></div><div class="in tb-live" id="tb-live" hidden></div><div class="tb-stripes" aria-hidden="true"><i></i><i></i><i></i><i></i></div></div>'+
+    '<nav class="tabbar" aria-label="Sections">'+VGROUPS.map(function(g){return '<a href="#'+g[2][0]+'" data-group="'+g[0]+'">'+gIcon(g[0])+'<span>'+g[1]+'</span></a>';}).join('')+'</nav>'+
     VIEWS.map(function(v){return '<div class="view" data-view="'+v[0]+'" hidden></div>';}).join('')+
     '<footer>Route figures come from the group\'s GPX track. Gear lists show a typical weight on every line, counted in the totals until you type in your own. Weight classes follow the usual backpacking bands on base weight (ultralight under 4.5 kg, lightweight to 6.8 kg, traditional to 11.3 kg). Your gear, ticks and setups are private: saved in this browser, and in your own Claude account when you\'re signed in. Dates, bookings, the dates poll, who brings what and the group list are shared with everyone who opens this page.</footer>'+
   '</div>';
@@ -314,16 +319,53 @@ function compBar(s){
 }
 
 /* ----- overview ----- */
+function greet(){ var h=new Date().getHours(), n=ME.name(); return (h<12?'Morning':h<18?'Afternoon':'Evening')+(n?', '+n:''); }
+/* the route line and the whole-route profile for the home route card, from the GPX-derived track */
+function hbRoute(){
+  var X=D.route.x, Z=D.route.z, K=D.route.km, n=X.length, st=Math.max(1,Math.floor(n/160)), pts=[], i;
+  for(i=0;i<n;i+=st) pts.push([X[i],Z[i]]); pts.push([X[n-1],Z[n-1]]);
+  var x0=Math.min.apply(null,X), x1=Math.max.apply(null,X), z0=Math.min.apply(null,Z), z1=Math.max.apply(null,Z), W=150, H=330, sc=Math.min(W/(x1-x0),H/(z1-z0));
+  var P=function(x,z){ return ((x-x0)*sc).toFixed(1)+','+((z-z0)*sc).toFixed(1); };
+  var at=function(km){ var j=0,best=1e9; for(var k=0;k<n;k+=2){ var d=Math.abs(K[k]-km); if(d<best){best=d;j=k;} } return P(X[j],Z[j]).split(','); };
+  var camps=PLAN.stages.slice(0,-1).map(function(sg){ var c=at(sg.to); return '<circle cx="'+c[0]+'" cy="'+c[1]+'" r="4.5"/>'; }).join('');
+  var s0=at(0), s1=at(D.total), vw=((x1-x0)*sc).toFixed(0), vh=((z1-z0)*sc).toFixed(0);
+  return '<svg class="hb-line" role="img" aria-label="Route line from Sentinel Car Park in the north to Bushman\'s Nek in the south, with '+(N-1)+' camps" viewBox="-6 -6 '+(+vw+12)+' '+(+vh+12)+'">'+
+    '<path d="M'+pts.map(function(p){return P(p[0],p[1]);}).join(' L')+'" fill="none" stroke="var(--route)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="14 10"/>'+
+    '<g fill="var(--sunset-gold)" stroke="var(--fynbos)" stroke-width="2">'+camps+'</g>'+
+    '<circle cx="'+s0[0]+'" cy="'+s0[1]+'" r="6" fill="#EFE6D0" stroke="var(--fynbos)" stroke-width="2"/><circle cx="'+s1[0]+'" cy="'+s1[1]+'" r="6" fill="#222324" stroke="#EFE6D0" stroke-width="2"/></svg>';
+}
+function hbProfile(){
+  var K=D.route.km, E=D.route.e, n=K.length, tot=D.total, M=140, lo=1700, hi=3550, out=[], j=0;
+  for(var k=0;k<=M;k++){ var x=tot*k/M, sum=0, c=0; while(j<n-1&&K[j]<x-tot/M/2) j++; for(var i=j;i<n&&K[i]<=x+tot/M/2;i++){ sum+=E[i]; c++; } out.push(c?sum/c:E[Math.min(j,n-1)]); }
+  var d='M'+out.map(function(e,k){ return (350*k/M).toFixed(1)+','+(90-(e-lo)/(hi-lo)*90).toFixed(1); }).join(' L');
+  return '<svg class="hb-prof" role="img" aria-label="Elevation profile of the whole route, highest point '+fmt(D.maxe)+' m" viewBox="0 0 350 90" preserveAspectRatio="none"><path d="'+d+' L350,90 L0,90 Z" fill="#26341F"/><path d="'+d+'" fill="none" stroke="var(--sunset-gold)" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>';
+}
+function hbNext(){
+  var td=ME.todos().slice(0,3), lbl=function(h){ var v=h.slice(1), f=VIEWS.filter(function(x){return x[0]===v;})[0]; return f?f[1]:'Open'; };
+  return td.length?'<ul class="hb-list">'+td.map(function(x){ return '<li><span>'+x[1]+'</span><a href="'+x[0]+'">'+esc(lbl(x[0]))+'</a></li>'; }).join('')+'</ul>'
+    :'<p class="note" style="margin:6px 0 0">You\'re up to date. Check back as the group fills in the plan.</p>';
+}
 function vOverview(){
-  var on=datesOn(), n=on?daysBetween(today(),TS()):null;
-  var startTxt=on?esc(short(TS())):'after the poll';
-  return '<header class="ov-hero"><div class="ov-copy"><h1><span class="mark">DGT</span><span class="sub">Trip planner</span></h1>'+
-      '<p class="lede">'+N+' days along the top of the uKhahlamba escarpment, from Sentinel car park to the Lesotho border post at Bushman\'s Nek. Dates, bookings, the route, and everyone\'s gear and food in one place.</p>'+
-      '<dl class="ov-facts"><div><dt>Distance</dt><dd>'+fmt(totalKm)+' km</dd></div><div><dt>Climbing</dt><dd>'+fmt(totalUp)+' m</dd></div><div><dt>On the trail</dt><dd>'+N+' days</dd></div>'+
-      '<div><dt>Start</dt><dd>'+startTxt+(on?'':' <a class="ov-poll" href="#trip">vote</a>')+'</dd></div></dl></div>'+
-      '<img class="badge" src="'+BADGE+'" alt="Drakensberg Grand Traverse expedition badge: DGT, uKhahlamba, Barrier of Spears" width="260" height="260"></header>'+
-    ME.card()+
-    (on?'':POLL.card())+
+  var on=datesOn(), s=summary(cur()), est=estList(s).length;
+  var poll=on?'':'<div class="hb-poll"><div class="hb-poll-t"><b>The dates poll is open</b><span>Pick the start dates that work for you. Flights come after.</span></div><button class="btn primary" data-act="gopoll">Vote on dates</button></div>';
+  var stages=PLAN.stages.map(function(sg,i){ var last=i===PLAN.stages.length-1;
+    return '<li><a class="hb-stage'+(last?' last':'')+'" href="#day-'+sg.day+'"><span class="hb-day">DAY '+sg.day+'</span><span class="hb-st">'+esc(sg.title.replace(' → ',' to '))+'</span><span class="hb-sm">'+fmt(sg.dist,1)+' km, '+(last?fmt(sg.down)+' m down':fmt(sg.up)+' m up')+'</span></a></li>'; }).join('');
+  var avc=['#222324','#5E6A58','#C8843A','#A4532A'];
+  return '<section class="hb-top"><div class="hb-hi"><p id="hb-greet">'+esc(greet())+'</p><h1>'+N+' days on the escarpment, '+BUFFER+' in reserve</h1></div>'+poll+'</section>'+
+    '<div class="hb-main">'+
+      '<section class="hb-route" aria-labelledby="hb-route-h">'+hbRoute()+
+        '<div class="hb-rt"><h2 id="hb-route-h">Drakensberg Grand Traverse</h2><p>Sentinel Car Park to Bushman\'s Nek, along the border of South Africa and Lesotho</p>'+
+        '<dl class="hb-facts"><div><dt>Distance</dt><dd>'+fmt(D.total)+' km</dd></div><div><dt>Climbing</dt><dd>'+fmt(D.gain)+' m</dd></div><div><dt>Highest</dt><dd>'+fmt(D.maxe)+' m</dd></div><div><dt>Days</dt><dd>'+N+' + '+BUFFER+'</dd></div><div><dt>Start</dt><dd>'+(on?esc(short(TS())):'After the poll')+'</dd></div></dl>'+
+        '<a class="btn light" href="#route">Open the route map</a></div>'+hbProfile()+'</section>'+
+      '<div class="hb-side">'+
+        '<section class="hb-pack" aria-labelledby="hb-pack-h"><div class="hb-ph"><h2 id="hb-pack-h">Your pack at Sentinel</h2><a href="#compare">'+esc(L.names[L.active])+'</a></div>'+
+          '<div class="hb-big num">'+fmt(s.pack/1000,1)+' <small>kg</small></div><div class="hb-sub">base '+kg(s.base)+', plus '+kg(s.worn)+' worn'+(est?'. Estimate: '+est+' item'+(est>1?'s':'')+' not weighed yet':'')+'</div>'+
+          compBar(s)+'<a class="btn light" href="#gear">Open my kit</a></section>'+
+        '<section class="hb-next" aria-labelledby="hb-next-h"><h2 id="hb-next-h">Next for you</h2><div id="hb-next">'+hbNext()+'</div></section>'+
+      '</div></div>'+
+    '<section class="hb-stages-s" aria-labelledby="hb-stages-h"><div class="ov-h"><h2 id="hb-stages-h">The '+(N===10?'ten':N)+' stages</h2><a href="#route">Plan the days</a></div><ol class="hb-stages">'+stages+'</ol></section>'+
+    '<section class="hb-group" aria-labelledby="hb-group-h"><h2 id="hb-group-h">The group</h2><ul>'+GROUP_NAMES.map(function(n,i){ return '<li><span class="hb-av" style="background:'+avc[i%4]+(i===2?';color:#222324':'')+'" aria-hidden="true">'+esc(n.charAt(0))+'</span>'+esc(n)+'</li>'; }).join('')+'</ul><a class="btn primary" href="#group">Who carries what</a></section>'+
+    (on?'':'<div id="hb-poll-full">'+POLL.card()+'</div>')+
     '<div class="ov-two"><section class="ov-sec" aria-labelledby="ov-gg-h"><div class="ov-h"><h2 id="ov-gg-h">Group gear</h2><a href="#group">Who brings what</a></div>'+
       '<p class="note">Shared items anyone can add. What you claim shows in My gear and counts in your pack.</p><div id="ov-gg">'+ovGG()+'</div></section>'+
     '<section class="ov-sec" aria-labelledby="ov-bk-h"><div class="ov-h"><h2 id="ov-bk-h">Bookings</h2><a href="#links">Shuttles and places to stay</a></div>'+ovBookings()+'</section></div>'+
@@ -353,6 +395,23 @@ function ovBookings(){
 var ME=(function(){
   function name(){ try{ return (localStorage.getItem('dgt-poll-name')||'').trim(); }catch(e){ return ''; } }
   function stat(href,k,v,s,warn){ return '<a class="me-stat'+(warn?' warn':'')+'" href="'+href+'"><span class="k">'+k+'</span><span class="v">'+v+'</span><span class="s">'+s+'</span></a>'; }
+  function todos(){
+    var nm=name(), s=summary(cur()), fd=food(), mc=fd.menu, f=L.food, t=+f.kcal||0;
+    var prepLeft=S.prep.length-S.prep.filter(function(p){return L.prep[p.id];}).length;
+    var gg=GG.me?GG.me():null, poll=POLL.mine?POLL.mine():null, ppl=PEOPLE.mine?PEOPLE.mine():null;
+    var miss=s.miss.length, short=mc&&t?t-fd.kcal:0, todo=[], ne=estList(s).length;
+    if(!nm) todo.push(['#trip','Put your name in the dates poll so the planner knows which answers and gear are yours']);
+    if(poll===false&&T.datesStatus!=='Confirmed') todo.push(['#trip','Answer the dates poll']);
+    if(ppl===false&&datesOn()) todo.push(['#people','Add your flights and travel details']);
+    if(miss) todo.push(['#gear','Tick or replace '+miss+' essential item'+(miss>1?'s':'')+' in '+esc(L.names[L.active])]);
+    if(ne) todo.push(['#gear','Weigh '+ne+' item'+(ne>1?'s':'')+' still on a typical weight']);
+    if(!mc) todo.push(['#food','Build your food menu']);
+    else if(short>50) todo.push(['#food','Your menu is about '+fmt(short)+' kcal a day short of your target']);
+    if(+f.spare<BUFFER) todo.push(['#food','Add food for the '+BUFFER+' buffer days']);
+    if(gg&&!gg.items.length) todo.push(['#group','Choose the group gear you\'ll carry'+(gg.open?' ('+gg.open+' essentials still unclaimed)':'')]);
+    if(prepLeft) todo.push(['#prep',prepLeft+' thing'+(prepLeft>1?'s':'')+' left on your before-you-go list']);
+    return todo;
+  }
   function inner(){
     var nm=name(), s=summary(cur()), fd=food(), mc=fd.menu, f=L.food, t=+f.kcal||0;
     var prepDone=S.prep.filter(function(p){return L.prep[p.id];}).length, prepLeft=S.prep.length-prepDone;
@@ -383,8 +442,8 @@ var ME=(function(){
         :'<p class="okbox">You\'re up to date. Check back as the group fills in the plan.</p>');
   }
   function card(){ return '<section class="me" id="me-card" aria-labelledby="me-h">'+inner()+'</section>'; }
-  function refresh(){ var el=$('me-card'); if(el&&view==='overview') el.innerHTML=inner(); }
-  return {card:card,refresh:refresh};
+  function refresh(){ var av=$('tb-av'); if(av) av.textContent=myInitial(); if(view==='overview'){ var nx=$('hb-next'); if(nx) nx.innerHTML=hbNext(); var gr=$('hb-greet'); if(gr) gr.textContent=greet(); } }
+  return {card:card,refresh:refresh,name:name,todos:todos};
 })();
 
 /* ----- links: shuttles, places to stay, permits. Kept with the trip details (the organiser edits, everyone sees) ----- */
@@ -1353,6 +1412,7 @@ function bind(){
       var out2=$('bk-out'); out2.innerHTML='<textarea class="code" readonly id="bk-code" style="margin-top:10px">'+esc(tsv)+'</textarea><div class="msg" id="bk-msg"></div>';
       var ta2=$('bk-code'); try{ navigator.clipboard.writeText(tsv).then(function(){$('bk-msg').textContent='Copied '+(rowsT.length-1)+' rows. In the group gear sheet, click cell A4 of your tab and paste.';},function(){ta2.select();$('bk-msg').textContent='Select the text above and copy it, then paste into cell A4 of your tab in the group gear sheet.';}); }catch(_){ ta2.select(); }
       return; }
+    if(a==='gopoll'){ var pf=$('hb-poll-full'); if(pf) pf.scrollIntoView({behavior:'smooth',block:'start'}); return; }
     if(a==='backup'){ var code='DGT3:'+btoa(unescape(encodeURIComponent(JSON.stringify(L))));
       var out=$('bk-out'); out.innerHTML='<textarea class="code" readonly id="bk-code" style="margin-top:10px">'+esc(code)+'</textarea><div class="msg" id="bk-msg"></div>';
       var ta=$('bk-code'); try{ navigator.clipboard.writeText(code).then(function(){$('bk-msg').textContent='Copied. Paste it somewhere safe, or into this page on another device.';},function(){ta.select();$('bk-msg').textContent='Select the code above and copy it.';}); }catch(_){ ta.select(); }

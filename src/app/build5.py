@@ -8,7 +8,7 @@ css=css.replace('minmax(150px,1fr));gap:10px}','minmax(140px,1fr));gap:10px}',1)
 css+=open('planner3_extra.css').read()+"\n@media (max-width:520px){.item .nq{display:none}}\n"+open('planner3_map.css').read()
 import urllib.parse
 topo='url("data:image/svg+xml,'+urllib.parse.quote(open('topo_mask.svg').read(),safe=" =:/,'.-")+'")'
-css+='\n:root{--topo:'+topo+'}\n'+open('planner_ds.css').read()
+css+='\n:root{--topo:'+topo+'}\n'+open('planner_ds.css').read()+'\n'+open('planner_b.css').read()
 st=open('static5.json').read(); d3=open('d3b.json').read()
 tr=json.dumps(json.load(open('trip.json')),ensure_ascii=False).replace('<','\\u003c')
 for x in (js,st,d3): assert '</script' not in x.lower()
