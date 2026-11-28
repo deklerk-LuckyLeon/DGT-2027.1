@@ -517,15 +517,26 @@ function renderRoute(el){
   var rows=PLAN.stages.map(function(d,i){
     var dt=stageDate(i), now=dt&&dt===today(), last=i===PLAN.stages.length-1;
     return '<tr class="click'+(now?' now':'')+'" data-goday="'+d.day+'"><td class="r"><b>'+d.day+'</b></td><td class="r">'+(dt?esc(short(dt)):'')+'</td>'+
-    '<td>'+esc(PLAN.original?S.days[i].stage:d.title)+'<span class="sub">'+(last?'Finish':({zone:'Camp area',cave:'Sleeping cave',wild:'Wild camp'}[d.camp.kind])+': '+esc(d.camp.name))+'</span></td>'+
+    '<td>'+esc(PLAN.original?S.days[i].stage:d.title)+'<span class="sub">'+(last?'Finish':({zone:'Camp area',cave:'Sleeping cave',wild:'Wild camp'}[d.camp.kind])+': '+esc(d.camp.name))+(D.summits||[]).filter(function(t){return stageOfKm(t.km)===i+1;}).map(function(t){return '<br>Summit side trip: '+esc(t.n)+', +'+fmt(t.rt,1)+' km';}).join('')+'</span></td>'+
     '<td class="r">'+fmt(d.dist,1)+'</td><td class="r">'+fmt(d.up)+'</td><td class="r hide-s">'+fmt(d.down)+'</td><td class="r hide-s">'+fmt(d.max)+'</td></tr>';
   }).join('');
   var mx=PLAN.stages.reduce(function(a,s){return Math.max(a,s.dist+s.up/100);},1);
-  $('route-table').innerHTML='<div class="card scroll"><table class="t"><thead><tr><th class="r">Day</th><th class="r">Date</th><th>Stage</th><th class="r">km</th><th class="r">Up m</th><th class="r hide-s">Down m</th><th class="r hide-s">High m</th></tr></thead><tbody>'+rows+
+  $('route-table').innerHTML=summitCard()+'<div class="card scroll"><table class="t"><thead><tr><th class="r">Day</th><th class="r">Date</th><th>Stage</th><th class="r">km</th><th class="r">Up m</th><th class="r hide-s">Down m</th><th class="r hide-s">High m</th></tr></thead><tbody>'+rows+
     '</tbody><tfoot><tr><td></td><td></td><td><b>Total</b></td><td class="r"><b>'+fmt(totalKm,1)+'</b></td><td class="r"><b>'+fmt(PLAN.stages.reduce(function(a,s){return a+s.up;},0))+'</b></td><td class="hide-s"></td><td class="r hide-s"><b>'+fmt(highest)+'</b></td></tr></tfoot></table></div>'+
     '<p class="note">Tap a row to zoom the map to that day.</p>';
 }
 
+/* summit checkpoints: which peaks the track goes over, and the side trips to the ones it passes beside */
+function stageOfKm(km){ var st=PLAN.stages; for(var i=0;i<st.length;i++) if(km<=st[i].to+1e-6) return i+1; return st.length; }
+function summitCard(){
+  var side={}; (D.summits||[]).forEach(function(t){ side[t.n]=t; });
+  var peaks=D.pois.filter(function(p){return p.c==='peak';}); if(!peaks.length) return '';
+  var tk=0,tu=0; (D.summits||[]).forEach(function(t){ tk+=t.rt; tu+=t.up; });
+  var rows=peaks.map(function(p){ var t=side[p.n];
+    return '<tr><td><b>'+esc(p.n)+'</b><span class="sub">km '+fmt(p.km,0)+'</span></td><td data-l="Day">'+stageOfKm(p.km)+'</td><td data-l="Summit">'+(t?'Side trip, about '+fmt(t.rt,1)+' km there and back, +'+fmt(t.up)+' m':'On the track')+'</td></tr>'; }).join('');
+  return '<div class="card"><h3 style="margin-bottom:6px">Summit checkpoints</h3><p class="note">The usual DGT summit list. The track goes over '+(peaks.length-(D.summits||[]).length)+' of them; for the other '+(D.summits||[]).length+' it passes beside the top, so tagging them means a side trip. Together the side trips add about <b>'+fmt(tk,0)+' km</b> and <b>'+fmt(tu)+' m</b> of climbing. They show as dotted lines on the map; distances are estimates from a straight line and the terrain model, not a mapped path.</p>'+
+    '<div class="scroll"><table class="t stack"><thead><tr><th>Peak</th><th>Day</th><th>Summit</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+}
 function planCard(){
   var st=PLAN.stages, n=st.length, g=groupDays();
   var avgKm=totalKm/n, avgUp=st.reduce(function(a,s){return a+s.up;},0)/n;
@@ -1569,7 +1580,7 @@ var MAP=(function(){
   var G=D.grid, NX=G.nx, NZ=G.nz, ST=G.step;
   var sel=0, cursorKm=null;
   var cv, ctx, W=0, H=0, dpr=1, cx=0, cz=0, sc=4, relief=null, F=4, need=false;
-  var layers={sleep:true,no:true,water:true,streams:true,zones:true,alts:true,labels:true,km:true,grade:false,bail:true,places:true};
+  var layers={sleep:true,no:true,water:true,streams:true,zones:true,alts:true,labels:true,km:true,grade:false,bail:true,places:true,summit:true};
   var OG=D.outer||null, outerRelief=null, ODEM=null, me=null, watchId=null, meFirst=false;
   var DEM=null, probe=null, hoverKm=null, measuring=false, mpts=[], full=false;
   /* grade (%) along the GPS track, smoothed over about ±150 m */
@@ -1641,7 +1652,7 @@ var MAP=(function(){
           '<button class="mb" id="mFit" aria-label="Whole route" title="Whole route"><i aria-hidden="true">◱</i><span class="t">Whole route</span></button><button class="mb" id="mLoc" aria-pressed="false" aria-label="Where am I" title="Show where you are (GPS)"><i aria-hidden="true">◎</i><span class="t">Where am I</span></button><button class="mb" id="mMeas" aria-pressed="false" aria-label="Measure" title="Measure distance and climb"><i aria-hidden="true">⟷</i><span class="t">Measure</span></button><button class="mb" id="mLay" aria-pressed="false" aria-label="Layers" title="Layers"><i aria-hidden="true">☰</i><span class="t">Layers</span></button><button class="mb" id="mFull" aria-pressed="false" aria-label="Full screen" title="Full screen"><i aria-hidden="true">⤢</i><span class="t">Full screen</span></button>'+
           '<div class="mlayers" id="mlayers" hidden>'+
             (TILES?'<fieldset class="mbase"><legend>Base map</legend><label><input type="radio" name="mbase" value="otm"'+(base==='otm'?' checked':'')+'> OpenTopoMap (needs a signal)</label><label><input type="radio" name="mbase" value="relief"'+(base!=='otm'?' checked':'')+'> Built-in relief (works offline)</label></fieldset>':'')+
-            [['grade','linear-gradient(90deg,#4F9A55,#E5A13C,#A8281C)','Colour the trail by steepness',1],['sleep','var(--good)','Sleeping caves'],['no','var(--danger)','No-camping caves'],['water','var(--water)','Water points from the GPX'],['streams','var(--water)','Likely streams (worked out from the terrain)'],['bail','var(--danger)','Bail-out passes and rough way down'],['zones','var(--sunset-gold)','Daily camp zones'],['alts','var(--ink-muted)','Alternate variants'],['km','var(--ink)','Kilometre marks'],['labels','var(--ink)','Peak names'],['places','var(--ink-muted)','Towns, camps and lodges nearby']]
+            [['grade','linear-gradient(90deg,#4F9A55,#E5A13C,#A8281C)','Colour the trail by steepness',1],['sleep','var(--good)','Sleeping caves'],['no','var(--danger)','No-camping caves'],['water','var(--water)','Water points from the GPX'],['streams','var(--water)','Likely streams (worked out from the terrain)'],['bail','var(--danger)','Bail-out passes and rough way down'],['summit','var(--ink)','Summit side trips (approximate line)'],['zones','var(--sunset-gold)','Daily camp zones'],['alts','var(--ink-muted)','Alternate variants'],['km','var(--ink)','Kilometre marks'],['labels','var(--ink)','Peak names'],['places','var(--ink-muted)','Towns, camps and lodges nearby']]
               .map(function(l){return '<label><input type="checkbox" data-layer="'+l[0]+'"'+(l[3]?'':' checked')+'><span class="sw" style="background:'+l[1]+'"></span>'+l[2]+'</label>';}).join('')+
             (window.DGT_CONFIG?'<div class="mext"><span>For your GPS app</span><a href="#" id="xGpx">Download GPX ↓</a></div>':'')+'<div class="mext"><span>Open this view in</span><a id="xOtm" target="_blank" rel="noopener">OpenTopoMap ↗</a><a id="xTopo" target="_blank" rel="noopener">topographic-map.com ↗</a><a id="xSat" target="_blank" rel="noopener">Satellite (Google Maps) ↗</a></div>'+
             '<div class="mleg"><span>Height</span><i></i><span class="ends"><b>1,000 m</b><b>2,000</b><b>3,000</b><b>3,500</b></span></div>'+
@@ -1742,6 +1753,9 @@ var MAP=(function(){
     // bail-out passes: rough way down (dashed) and a marker at the top
     if(layers.bail&&D.bail){ ctx.save(); D.bail.forEach(function(b){ var p=b.path; ctx.setLineDash([7,5]); line(p.x,p.z,0,p.x.length-1); ctx.strokeStyle=P.casing; ctx.lineWidth=5; ctx.stroke(); ctx.strokeStyle=P.bail; ctx.lineWidth=2.5; ctx.stroke(); ctx.setLineDash([]);
         var ex=sx(p.x[p.x.length-1]), ez=sy(p.z[p.z.length-1]); ctx.beginPath(); ctx.arc(ex,ez,3.5,0,7); ctx.fillStyle=P.bail; ctx.fill(); }); ctx.restore(); }
+    // summit side trips: a dotted out-and-back from the trail to peaks the track passes beside
+    if(layers.summit&&D.summits){ ctx.save(); ctx.lineCap='round'; D.summits.forEach(function(t){ ctx.beginPath(); ctx.moveTo(sx(t.x),sy(t.z)); ctx.lineTo(sx(t.sx),sy(t.sz));
+        ctx.setLineDash([]); ctx.strokeStyle=P.casing; ctx.lineWidth=6; ctx.stroke(); ctx.setLineDash([1,6]); ctx.strokeStyle=P.ink; ctx.lineWidth=3.5; ctx.stroke(); }); ctx.restore(); }
     // points
     function dot(x,z,r,fill){ var X=sx(x),Y=sy(z); if(X<-10||Y<-10||X>W+10||Y>H+10) return; ctx.beginPath(); ctx.arc(X,Y,r,0,7); ctx.fillStyle=fill; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle=P.dotRing; ctx.stroke(); }
     var cr=sc>=20?5:sc>=8?4:3;
@@ -1810,7 +1824,7 @@ var MAP=(function(){
     if(sel===0){
       p.innerHTML='<div class="dno">The whole route, '+n+'-day plan</div><h2>'+(n===11?'Eleven':n)+' days along the roof of southern Africa</h2>'+
         '<p>'+(PLAN.original?'Camps follow the route guide.':'Camps are chosen to even out each day\'s effort, preferring known camp areas and sleeping caves. Each day includes the route-guide text for that stretch.')+' Pick a day to zoom to it.</p><h4>Days</h4>'+
-        st.map(function(s,i){return '<button class="dayrow3" data-day="'+(i+1)+'"><span class="n">'+String(i+1).padStart(2,'0')+'</span><span class="t">'+esc(PLAN.original?D.days[i].title:s.title)+(TS()?'<small>'+esc(short(stageDate(i)))+'</small>':'')+'</span><span class="d">'+fmt(s.dist,1)+' km, +'+fmt(s.up)+' m</span></button>';}).join('');
+        st.map(function(s,i){return '<button class="dayrow3" data-day="'+(i+1)+'"><span class="n">'+String(i+1).padStart(2,'0')+'</span><span class="t">'+esc(PLAN.original?D.days[i].title:s.title)+(TS()?'<small>'+esc(short(stageDate(i)))+'</small>':'')+'</span><span class="d">'+fmt(s.dist,1)+' km, +'+fmt(s.up)+' m</span></button>';}).join('')+(D.summits&&D.summits.length?'<p class="dp-lead">Dotted lines are side trips to summits the track passes beside: '+D.summits.map(function(t){return esc(t.n)+' (+'+fmt(t.rt,1)+' km)';}).join(', ')+'. See Summit checkpoints below the map.</p>':'');
       p.innerHTML='<div class="dp-ov">'+p.innerHTML+'</div>';
     } else {
       var s=st[sel-1], z=zones[sel-1], last=sel===n, c=s.camp;
@@ -1820,7 +1834,9 @@ var MAP=(function(){
       if(PLAN.original){ facts='<h4>Peaks and checkpoints</h4><p>'+esc(D.days[sel-1].high)+'</p>'; guide='<h4>The route guide</h4>'+guideParas(sel-1); }
       else {
         var peaks=D.pois.filter(function(q){return q.c!=='water'&&q.km>=s.from-0.1&&q.km<=s.to+0.1;}).map(function(q){return q.n+' (km '+fmt(q.km,1)+')';});
-        facts='<h4>Peaks and checkpoints</h4><p>'+(peaks.length?esc(peaks.join(', ')):'None on this stretch.')+'</p>';
+        var trips=(D.summits||[]).filter(function(t){return t.km>=s.from-0.1&&t.km<=s.to+0.1;});
+        facts='<h4>Peaks and checkpoints</h4><p>'+(peaks.length?esc(peaks.join(', ')):'None on this stretch.')+'</p>'+
+          (trips.length?'<p><b>Summit side trip'+(trips.length>1?'s':'')+':</b> '+trips.map(function(t){return esc(t.n)+' from km '+fmt(t.km,1)+', about '+fmt(t.rt,1)+' km there and back, +'+fmt(t.up)+' m';}).join('; ')+'. Not counted in the distance above.</p>':'');
         guide='<h4>The route guide</h4><p class="dp-lead">This day covers parts of guide '+(s.guide.length>1?'days ':'day ')+s.guide.map(function(g){return g+1;}).join(' and ')+'. Read the stretch between km '+fmt(s.from,1)+' and km '+fmt(s.to,1)+'.</p>'+
           s.guide.map(function(gi){var g=D.dstats[gi];return '<details class="gd" open><summary>Guide day '+(gi+1)+': '+esc(D.days[gi].title)+' <i>km '+fmt(g.from,1)+'–'+fmt(g.to,1)+'</i></summary>'+guideParas(gi)+'</details>';}).join('');
       }
@@ -1842,7 +1858,8 @@ var MAP=(function(){
     showPop('<h3>'+esc(c.n)+'</h3><div class="meta">'+st+(c.e?' · '+fmt(c.e)+' m':'')+' · km '+fmt(c.km,1)+' · '+(c.off<1000?c.off+' m':fmt(c.off/1000,1)+' km')+' off route</div>'+(c.cap?'<p>Capacity: '+esc(c.cap)+'</p>':'')+(c.note?'<p>'+esc(c.note)+'</p>':'')+coordRow(c.lat,c.lon)); }
   function showStream(w){ var ll=toLL(w.x,w.z);
     showPop('<h3>Likely stream</h3><div class="meta">km '+fmt(w.km,1)+' · Day '+dayOfKm(w.km)+'</div><p>Worked out from the terrain: about '+fmt(w.a,1)+' km² drains to this point on the line. '+(w.a>=3?'A stream this size usually runs in March.':'Small: in March it is usually a trickle, and can be dry after a dry spell.')+' Check it on the Slingsby map and fill up at the bigger ones.</p>'+coordRow(ll.lat,ll.lon)); }
-  function showPoi(p){ var t={peak:'Peak / checkpoint',water:'Water point',start:'Start',finish:'Finish'}[p.c]||''; showPop('<h3>'+esc(p.n)+'</h3><div class="meta">'+t+' · km '+fmt(p.km,1)+' · Day '+dayOfKm(p.km)+'</div>'+coordRow(p.lat,p.lon)); }
+  function showPoi(p){ var t={peak:'Peak / checkpoint',water:'Water point',start:'Start',finish:'Finish'}[p.c]||'', st=(D.summits||[]).filter(function(x){return x.n===p.n;})[0];
+    showPop('<h3>'+esc(p.n)+'</h3><div class="meta">'+t+' · km '+fmt(p.km,1)+' · Day '+dayOfKm(p.km)+'</div>'+(st?'<p>The track passes about '+fmt(st.line,1)+' km from the summit ('+fmt(st.e)+' m). Side trip from km '+fmt(st.km,1)+': about '+fmt(st.rt,1)+' km there and back and '+fmt(st.up)+' m of climbing. The dotted line is a straight guide, not a mapped path.</p>':(p.c==='peak'?'<p>The track goes over the summit.</p>':''))+coordRow(p.lat,p.lon)); }
   function showBail(b){ showPop('<h3>'+esc(b.n)+'</h3><div class="meta">Bail-out · km '+fmt(b.km,0)+' · Day '+dayOfKm(b.km)+' · top about '+fmt(b.e)+' m</div><p>'+esc(b.note)+'</p>'+
       '<p>Rough way down: about '+fmt(b.len,1)+' km to around '+fmt(b.end)+' m on the KZN side. This line is worked out from the terrain, not a mapped path: follow the pass on the Slingsby map and check where it comes out and how you get a lift from there.</p>'+coordRow(b.lat,b.lon)); }
   function showZone(z){ showPop('<h3>Day '+z.day+' camp: '+esc(z.t)+'</h3><div class="meta">'+esc(z.range)+' · ±'+z.r+' km'+(TS()?' · night of '+esc(short(stageDate(z.day-1))):'')+'</div><p>'+esc(z.note)+'</p>'+coordRow(z.lat,z.lon)); }

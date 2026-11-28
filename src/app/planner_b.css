@@ -210,3 +210,10 @@ body::after{background:var(--topo) center/cover no-repeat;-webkit-mask:none;mask
   table.stack.bk td:nth-child(3){order:3;font-size:13px}
   table.stack.bk td:nth-child(4){order:4;font-size:13px}
 }
+/* Map layers panel: fits the map and scrolls, beside the buttons */
+.mhud{bottom:10px}
+.mlayers{position:absolute;top:0;right:calc(100% + 8px);max-height:100%;overflow-y:auto;overscroll-behavior:contain;width:min(280px,calc(100vw - 110px));box-sizing:border-box;-webkit-overflow-scrolling:touch}
+.mapbox.full .mhud{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.mhud{pointer-events:none}.mhud>*{pointer-events:auto}
+@media (max-width:600px){.mlayers{width:calc(100vw - 150px);font-size:12.5px;padding:10px}}
+.mhud{z-index:4}
