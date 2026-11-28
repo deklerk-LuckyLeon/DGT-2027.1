@@ -146,3 +146,67 @@ section.hb-group{flex-direction:row;flex-wrap:wrap;align-items:center;gap:16px 2
 .seg{border-radius:999px;overflow:hidden;border:1px solid var(--contour);background:var(--surface-raised)}
 .seg button{border:0!important;border-radius:999px!important;font-family:var(--f-body)}
 .seg button[aria-pressed="true"]{background:var(--night)!important;color:var(--cream)!important}
+
+/* ==== Review fixes (Nov 2026) ==== */
+/* Topo lines as a plain image, not a mask: some browsers and page captures drop the mask and leave a grey veil */
+body::after{background:var(--topo) center/cover no-repeat;-webkit-mask:none;mask:none;opacity:.09}
+:root[data-theme="dark"] body::after{filter:invert(1);opacity:.10}
+.hb-route::before{background:var(--topo) center/cover no-repeat;-webkit-mask:none;mask:none;filter:invert(1);opacity:.10}
+/* Tiles have a card surface now, so they need inner space */
+.tile{padding:14px 16px}
+.hero{gap:12px}
+/* Gauge: room for the marker label above the bands */
+.gauge{margin-top:34px}
+/* Category bars: names wrap instead of being cut off */
+.hbar .nm{white-space:normal;overflow:visible;line-height:1.25}
+@media (max-width:520px){.hbar,.ab{grid-template-columns:minmax(0,120px) minmax(0,1fr) 58px;gap:8px}}
+/* Live figures bar: keep each figure together */
+.tb-live>span:not(.lv-warn){white-space:nowrap}
+@media (max-width:600px){.tb-live{gap:2px 14px}.tb-live .lv-name{flex-basis:100%}}
+#pack text{font-size:11px}
+/* Gauge labels: a little air between bands */
+.gauge .lbls{gap:6px}
+.gauge .lbls span{line-height:1.25}
+/* Gear rows on phones: give the item name more room */
+@media (max-width:520px){
+  .item{grid-template-columns:22px minmax(0,1fr) 70px 28px;gap:6px}
+  .item .g input{width:54px}
+}
+.cat-h .mono,.cat-h .cat-t{white-space:nowrap}
+/* Food rows */
+.fd-row input{border-radius:10px}
+.fd-row .fd-name{background:var(--surface-raised);border-color:var(--contour);font-weight:600}
+@media (max-width:760px){
+  .fd-in span{font-family:var(--f-body);font-size:11px;letter-spacing:0;white-space:normal;overflow:visible;line-height:1.2}
+}
+@media (max-width:760px){
+  .topbar{transition:transform .25s ease}
+  .topbar.tb-hide{transform:translateY(calc(-100% - env(safe-area-inset-top,0px) - 2px))}
+}
+@media (prefers-reduced-motion:reduce){.topbar{transition:none}}
+/* Day chips on the route: same pill language as the rest */
+.dchip{font-family:var(--f-body);background:var(--surface-raised);border-color:var(--contour)}
+.dchip[aria-pressed="true"]{background:var(--night)!important;border-color:var(--night)!important;color:var(--cream)!important}
+.dchip[aria-pressed="true"] small{color:#B9B09C!important}
+@media (max-width:600px){.mhint{bottom:44px}}
+/* Narrow tables become stacked rows on phones */
+@media (max-width:600px){
+  table.stack,table.stack tbody{display:block}
+  table.stack thead{display:none}
+  table.stack tr{display:block;padding:12px 0;border-bottom:1px solid var(--contour)}
+  table.stack tr.now{padding-inline:12px;border-radius:14px}
+  table.stack td{display:block;padding:2px 0!important;border:0!important;white-space:normal!important}
+  table.stack td[data-l]::before{content:attr(data-l) ": ";color:var(--ink-muted)}
+}
+/* Group gear: claim buttons as pills */
+.gg-add{font-family:var(--f-body);font-size:13px;font-weight:500;color:var(--ink);border:1px solid rgba(34,35,36,.22);border-radius:999px;padding:5px 12px;min-height:32px}
+.gg-add:hover{border-color:var(--ink)}
+.gg-st,.gg-need{border-radius:8px}
+@media (max-width:600px){
+  table.stack.bk tr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+  table.stack.bk td{text-align:left}
+  table.stack.bk td:nth-child(2){order:-1;flex-basis:100%}
+  table.stack.bk td:empty{display:none}
+  table.stack.bk td:nth-child(3){order:3;font-size:13px}
+  table.stack.bk td:nth-child(4){order:4;font-size:13px}
+}

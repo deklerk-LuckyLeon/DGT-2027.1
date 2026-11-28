@@ -283,7 +283,7 @@ function shell(){
 }
 function viewEl(v){return document.querySelector('[data-view="'+v+'"]');}
 function show(v,day){
-  var changed=v!==view; view=v;
+  var changed=v!==view; view=v; var tbh=document.querySelector(".topbar"); if(tbh) tbh.classList.remove("tb-hide");
   var gv=groupOf(v)[0];
   document.querySelectorAll('[data-group]').forEach(function(a){ if(a.dataset.group===gv) a.setAttribute('aria-current','true'); else a.removeAttribute('aria-current'); });
   document.querySelectorAll('[data-tab]').forEach(function(a){ a.hidden=a.dataset.g!==gv; if(a.dataset.tab===v) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
@@ -499,8 +499,12 @@ function updateLive(){
   else if(view==='food'){ var fd=food(), t=+L.food.kcal||0, b=burnEst(); h='<span class="lv-name">'+esc((fMenu()||{}).name||'Quick estimate')+'</span><span'+(fd.menu&&t&&fd.kcal<t-50?' class="lv-warn"':'')+'><b>'+fmt(fd.kcal)+'</b> of '+fmt(t)+' kcal a day</span><span><b>'+fmt(fd.perDay)+' g</b> a day</span><span><b>'+kg(fd.total)+'</b> to carry'+(fd.menu?'':' <span class="lv-est">estimate</span>')+'</span>'+(b?'<span class="lv-opt"><b>'+(b.kg>0.05?'−'+fmt(b.kg,1):'±0')+' kg</b> body weight</span>':''); }
   el.innerHTML=h; el.hidden=!h; setHdr();
 }
+/* phones: the header slides away while you scroll down and comes back when you scroll up; the tab bar stays */
+(function(){ var lastY=0; window.addEventListener('scroll',function(){ var tb=document.querySelector('.topbar'); if(!tb) return; var y=window.scrollY||0;
+  if(window.innerWidth>760||y<tb.offsetHeight){ tb.classList.remove('tb-hide'); lastY=y; return; }
+  var d=y-lastY; if(Math.abs(d)<8) return; tb.classList.toggle('tb-hide',d>0); lastY=y; },{passive:true}); })();
 function setHdr(){ var tb=document.querySelector('.topbar'); if(tb) document.documentElement.style.setProperty('--hdr',tb.offsetHeight+'px'); }
-window.addEventListener('resize',function(){ clearTimeout(window._hdrT); window._hdrT=setTimeout(setHdr,150); });
+window.addEventListener('resize',function(){ clearTimeout(window._hdrT); window._hdrT=setTimeout(function(){ setHdr(); if(view==='weight') drawPackChart(); },150); });
 
 /* ----- route ----- */
 function renderRoute(el){
@@ -700,7 +704,7 @@ function vWeight(){
 }
 function drawPackChart(){
   var el=$('pack'); if(!el) return;
-  var data=packByDay(), W=1000,H=250,m={l:44,r:10,t:22,b:26};
+  var data=packByDay(), cw=el.clientWidth||1000, W=Math.max(320,Math.min(1000,Math.round(cw))), H=W<600?230:250, m={l:W<600?38:44,r:8,t:22,b:26};
   var max=Math.ceil(Math.max.apply(null,data.map(function(d){return d.total;}))/2000)*2000||2000;
   var bw=(W-m.l-m.r)/data.length;
   function y(v){return m.t+(H-m.t-m.b)*(1-v/max);}
@@ -711,7 +715,8 @@ function drawPackChart(){
     var acc=0, x0=m.l+i*bw+bw*0.18, w=bw*0.64;
     keys.forEach(function(k,ki){ var h=d[k]; if(h<=0) return; var top=y(acc+h), hh=Math.max(0,y(acc)-y(acc+h)-2);
       s+='<rect x="'+x0+'" y="'+top+'" width="'+w+'" height="'+hh+'" fill="'+SER[ki][1]+'"'+(ki===3?' rx="3"':'')+'><title>Day '+d.day+' · '+SER[ki][2]+' '+kg(h)+'</title></rect>'; acc+=h; });
-    s+='<text x="'+(x0+w/2)+'" y="'+(y(d.total)-6)+'" text-anchor="middle" style="fill:var(--ink)">'+fmt(d.total/1000,1)+'</text><text x="'+(x0+w/2)+'" y="'+(H-8)+'" text-anchor="middle">D'+d.day+'</text>';
+    if(bw>=30||i%2===0||i===data.length-1) s+='<text x="'+(x0+w/2)+'" y="'+(y(d.total)-6)+'" text-anchor="middle" style="fill:var(--ink)">'+fmt(d.total/1000,1)+'</text>';
+    s+='<text x="'+(x0+w/2)+'" y="'+(H-8)+'" text-anchor="middle">D'+d.day+'</text>';
   });
   s+='</svg><div class="legend" style="margin-top:6px">'+SER.map(function(c){return '<span><i style="background:'+c[1]+'"></i>'+c[2]+'</span>';}).join('')+'</div>';
   el.innerHTML=s;
@@ -912,7 +917,7 @@ var FOOD=(function(){
   function rowHTML(it){
     return '<div class="fd-row" data-fid="'+it.id+'">'+
       '<input class="fd-name" data-fd="name" value="'+esc(it.name)+'" aria-label="Food">'+
-      '<label class="fd-in"><span>dry g a day</span><input data-fd="g" inputmode="decimal" value="'+(it.g==null?'':esc(it.g))+'"'+(it.g==null?' class="need"':'')+'></label>'+
+      '<label class="fd-in"><span>g a day</span><input data-fd="g" inputmode="decimal" value="'+(it.g==null?'':esc(it.g))+'"'+(it.g==null?' class="need"':'')+'></label>'+
       '<label class="fd-in"><span>kcal/100 g</span><input data-fd="k" inputmode="decimal" value="'+(it.k==null?'':esc(it.k))+'"'+(it.k==null?' class="need"':'')+'></label>'+
       '<label class="fd-in"><span>protein/100 g</span><input data-fd="p" inputmode="decimal" value="'+(it.p==null?'':esc(it.p))+'"></label>'+
       '<label class="fd-in"><span>days</span><input data-fd="days" inputmode="numeric" placeholder="all" value="'+(it.days==null?'':esc(it.days))+'"></label>'+
@@ -1088,7 +1093,7 @@ var FOOD=(function(){
       if(pc<40) out.push(['warn','Only about '+fmt(pc)+'% of the energy comes from carbohydrate. On long climbs carbs are the main fuel: oats, wraps, couscous, mash, dried fruit and sweets help.']);
       if(pf>50) out.push(['warn','About '+fmt(pf)+'% of the energy comes from fat. Light to carry, but appetite drops with altitude and very fatty food can be hard to get down: balance it with carbs.']); }
     if(bw&&mc.hasP){ var pk=mc.ppd/bw; if(pk<1.2) out.push(['warn','Protein is about '+fmt(mc.ppd)+' g a day ('+fmt(pk,1)+' g per kg). Trekking guidance is 1.2–2.0 g per kg: biltong, droëwors, cheese, milk powder, Future Life or a recovery shake help.']); }
-    if(+f.spare<BUFFER) out.push(['warn','The group plans '+N+' trail days plus '+BUFFER+' buffer days for weather or delays, but you carry food for '+fmt(+f.spare||0,1)+' buffer day'+(+f.spare===1?'':'s')+'.'+(mc.spG?' Your spare day is '+fmt(mc.spG)+' g.':'')+' <button class="linkbtn" data-fact="spare1">Carry '+BUFFER+' buffer days</button>',true]);
+    if(+f.spare<BUFFER) out.push(['warn','The group plans '+N+' trail days plus '+BUFFER+' buffer days for weather or delays, but you carry food for '+(+f.spare?fmt(+f.spare,(+f.spare)%1?1:0):'no')+' buffer day'+(+f.spare===1?'':'s')+'.'+(mc.spG?' Your spare day is '+fmt(mc.spG)+' g.':'')+' <button class="linkbtn" data-fact="spare1">Carry '+BUFFER+' buffer days</button>',true]);
     var gc=summary(cur()).consOther, hasDr=fMenu().items.some(function(i){return i.meal==='dr'&&num(i.g);});
     if(gc>0&&hasDr) out.push(['warn','Your gear list also has '+fmt(gc)+' g ticked under Other consumables (drink mixes, coffee). If those are the same drinks as in this menu, untick them in My gear so they aren\'t counted twice.']);
     return out;
@@ -1231,14 +1236,14 @@ function vTrip(){
   var booked=T.bookings.filter(function(b){return b.status!=='To book';}).length;
   var rows=T.bookings.map(function(b){
     return '<tr><td><span class="pill">'+esc(b.type)+'</span></td><td><b>'+esc(b.title)+'</b>'+(b.details?'<span class="sub">'+esc(b.details)+'</span>':'')+'</td>'+
-      '<td class="r">'+(b.date&&datesOn()?esc(short(b.date)):'<span style="color:var(--faint)">'+(datesOn()?'—':'after the poll')+'</span>')+'</td><td class="r">'+esc(b.cost||'')+'</td><td><span class="pill '+statCls(b.status)+'">'+esc(b.status)+'</span></td></tr>';
+      '<td class="r" data-l="Date">'+(b.date&&datesOn()?esc(short(b.date)):'<span style="color:var(--faint)">'+(datesOn()?'—':'after the poll')+'</span>')+'</td><td class="r">'+esc(b.cost||'')+'</td><td><span class="pill '+statCls(b.status)+'">'+esc(b.status)+'</span></td></tr>';
   }).join('');
   return (T.datesStatus==='Confirmed'?'<p class="okbox" style="margin-top:14px">Dates locked in: on the trail '+esc(short(TS()))+' – '+esc(short(endDate()))+'.</p>':'<div style="padding-top:12px">'+POLL.card()+'</div>')+'<div class="head" style="padding-top:12px"><div><h2>Dates &amp; bookings</h2><p class="note">'+booked+' of '+T.bookings.length+' sorted. The same for everyone who opens this page.</p></div>'+
     (canEdit?'<button class="btn primary" data-act="edit-trip">Edit trip details</button>':'')+'</div>'+
     '<div class="grid2"><div class="card"><h3 style="margin-bottom:8px">Timeline</h3>'+
     (!on?'<p class="note">The timeline fills in once the dates poll is locked in. Book flights first, then the shuttles and beds around them.</p>':ev.length?'<ul class="timeline">'+ev.map(function(e){return '<li class="'+e.cls+'"><div class="d">'+esc(short(e.d))+'</div><div class="dot"></div><div class="w"><b>'+esc(e.w)+'</b>'+(e.s?'<span>'+esc(e.s)+'</span>':'')+'</div></li>';}).join('')+'</ul>':'<div class="empty">No dates yet.</div>')+
     (on&&(!T.arrive||!T.depart)?'<p class="note">Arrival and departure dates are still to be added.</p>':'')+
-    '</div><div class="card"><h3 style="margin-bottom:8px">Flights, accommodation and shuttles</h3><div class="scroll"><table class="t"><thead><tr><th>Type</th><th>What</th><th class="r">Date</th><th class="r">Cost</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div></div></div>'+
+    '</div><div class="card"><h3 style="margin-bottom:8px">Flights, accommodation and shuttles</h3><div class="scroll"><table class="t stack bk"><thead><tr><th>Type</th><th>What</th><th class="r">Date</th><th class="r">Cost</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div></div></div>'+
     (saveMsg?'<div class="msg '+(saveMsg.indexOf('Saved')===0?'ok':'bad')+'">'+esc(saveMsg)+'</div>':'');
 }
 function editForm(){
@@ -1301,7 +1306,7 @@ function vTraining(){
   var t=today(), tr=trS(), wk=weekKey(), log=tr.log[wk]||{}, ses=weekSessions();
   var ph=S.training.filter(function(p){return t>=p.from&&t<=p.to;})[0];
   var rows=S.training.map(function(p){var now=t>=p.from&&t<=p.to;
-    return '<tr'+(now?' class="now"':'')+'><td><b>'+esc(p.phase)+'</b>'+(now?' <span class="pill acc">now</span>':'')+'<span class="sub">Weeks '+esc(p.weeks)+' · '+esc(short(p.from))+' – '+esc(short(p.to))+'</span></td><td>'+esc(p.focus)+'</td><td>'+esc(p.long)+'</td></tr>';}).join('');
+    return '<tr'+(now?' class="now"':'')+'><td><b>'+esc(p.phase)+'</b>'+(now?' <span class="pill acc">now</span>':'')+'<span class="sub">Weeks '+esc(p.weeks)+' · '+esc(short(p.from))+' – '+esc(short(p.to))+'</span></td><td data-l="Weekly sessions">'+esc(p.focus)+'</td><td data-l="Long walk">'+esc(p.long)+'</td></tr>';}).join('');
   var done=ses.filter(function(x){return log[x[0]];}).length;
   var hist=[], w0=weekKey(S.training[0].from); for(var w=7;w>=0;w--){ var k=addDays(wk,-7*w); if(k<w0) continue; var l=tr.log[k]||{}, n=Object.keys(l).filter(function(z){return l[z];}).length; hist.push('<span class="tr-wk'+(k===wk?' now':'')+'" title="Week of '+esc(nice(k))+': '+n+' done"><i style="height:'+Math.min(100,n/ses.length*100)+'%"></i><b>'+short(k).replace(/ \d{4}$/,'')+'</b></span>'); }
   var mine='<div class="card"><h3 style="margin-bottom:6px">My week</h3>'+
@@ -1313,10 +1318,10 @@ function vTraining(){
     '<p class="note"><b id="tr-n">'+done+'</b> of '+ses.length+' done this week.</p>'+
     (hist.length>1?'<div class="tr-hist" aria-label="Sessions done, last 8 weeks">'+hist.join('')+'</div>':'')+'</div>';
   function kbCard(k){ var c=KB[k]; return '<div class="card"><h3 style="margin-bottom:6px">'+esc(c.name)+'</h3><p class="note">'+esc(KB.warm)+' Rest about a minute between exercises.</p>'+
-    '<div class="scroll"><table class="t"><thead><tr><th>Exercise</th><th>Sets × reps</th><th>How and why</th></tr></thead><tbody>'+c.items.map(function(i){return '<tr><td><b>'+esc(i[0])+'</b></td><td style="white-space:nowrap">'+esc(i[1])+'</td><td>'+esc(i[2])+'</td></tr>';}).join('')+'</tbody></table></div></div>'; }
+    '<div class="scroll"><table class="t stack"><thead><tr><th>Exercise</th><th>Sets × reps</th><th>How and why</th></tr></thead><tbody>'+c.items.map(function(i){return '<tr><td><b>'+esc(i[0])+'</b></td><td style="white-space:nowrap" data-l="Sets">'+esc(i[1])+'</td><td>'+esc(i[2])+'</td></tr>';}).join('')+'</tbody></table></div></div>'; }
   var prog='<div class="card"><h3 style="margin-bottom:6px">How the kettlebell sessions change</h3><ul class="prep">'+KB.prog.map(function(p){return '<li><span><b>'+esc(p[0])+':</b> '+esc(p[1])+'</span></li>';}).join('')+'</ul></div>';
   return '<div class="head" style="padding-top:12px"><div><h2>Training</h2><p class="note">The group plan by phase, your own week to tick off, and two kettlebell sessions that work legs, back and shoulders for a loaded pack.</p></div></div>'+(t<S.training[0].from?'<p class="note">Training starts '+esc(nice(S.training[0].from,true))+'.</p>':'')+
-    mine+'<div class="card scroll"><table class="t"><thead><tr><th>Phase</th><th>Weekly sessions</th><th>Long weekend walk</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    mine+'<div class="card scroll"><table class="t stack"><thead><tr><th>Phase</th><th>Weekly sessions</th><th>Long weekend walk</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
     kbCard('A')+kbCard('B')+prog;
 }
 function vPrep(){
@@ -1853,7 +1858,7 @@ var MAP=(function(){
     return null;
   }
 
-  var pc,pctx,PW=0,PH=0,PAD={l:44,r:10,t:16,b:20},eMin=2400,eMax=3600;
+  var pc,pctx,PW=0,PH=0,PAD={l:56,r:10,t:16,b:20},eMin=2400,eMax=3600;
   function px(km){return PAD.l+km/D.total*(PW-PAD.l-PAD.r);}
   function py(e){return PAD.t+(1-(e-eMin)/(eMax-eMin))*(PH-PAD.t-PAD.b);}
   function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
